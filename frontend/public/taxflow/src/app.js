@@ -958,6 +958,7 @@ function saveInventoryItem(){
   }
   const tbody=document.getElementById('prod-tbody');
   if(tbody&&!hasFirstCellValue(tbody,code)){
+    setInventoryTableCleared(false);
     removeEmptyState(tbody);
     const row=document.createElement('tr');
     row.dataset.reorderLevel=reorderLevel;
@@ -1937,6 +1938,14 @@ function bulkSaveServer(collection,records,options={}){
   });
 }
 
+function deleteServer(collection,record,options={}){
+  return apiRequest('delete',{collection,record}).catch(err=>{
+    console.warn('Database delete failed:',err);
+    if(options.throwOnError)throw err;
+    return null;
+  });
+}
+
 async function moduleApi(path,options={}){
   const response=await authenticatedFetch(`${apiBaseUrl()}${path}`,{
     method:options.method||'GET',
@@ -2326,6 +2335,11 @@ function renderProductRecord(product,options={}){
 function syncStockLevelsFromProducts(){
   const tbody=document.getElementById('stock-level-tbody');
   if(!tbody)return;
+  if(isInventoryTableCleared()){
+    clearInventoryUiTables();
+    loadStockLevelsFromServer();
+    return;
+  }
   const stockByKey=new Map();
   [...document.querySelectorAll('#prod-tbody tr:not([data-empty-state])')]
     .map(row=>productStockLevelFromRow(row))
@@ -2357,6 +2371,25 @@ function syncStockLevelsFromProducts(){
 
 let stockLevelsLoading=false;
 let stockLevelsServerRefreshPaused=false;
+const INVENTORY_TABLE_CLEARED_KEY='taxflow_inventory_table_cleared';
+
+function isInventoryTableCleared(){
+  return localStorage.getItem(INVENTORY_TABLE_CLEARED_KEY)==='1';
+}
+
+function setInventoryTableCleared(value){
+  if(value)localStorage.setItem(INVENTORY_TABLE_CLEARED_KEY,'1');
+  else localStorage.removeItem(INVENTORY_TABLE_CLEARED_KEY);
+}
+
+function clearInventoryUiTables(){
+  emptyTableMessage(document.getElementById('stock-level-tbody'),'No stock items in database yet.');
+  emptyTableMessage(document.getElementById('prod-tbody'),'No products in database yet.');
+  emptyTableMessage(document.getElementById('stock-movement-tbody'),'No stock movements in database yet.');
+  emptyTableMessage(document.getElementById('stock-map-tbody'),'No stock mappings in database yet.');
+  clearStockMapPanel();
+  updateStockLevelStats([]);
+}
 
 async function loadStockLevelsFromServer(){
   const tbody=document.getElementById('stock-level-tbody');
@@ -2374,7 +2407,12 @@ async function loadStockLevelsFromServer(){
         reorderLevel:parseAmount(row.reorder_level??row.reorderLevel)
       }))
       .filter(item=>item.code||item.name);
-    if(!products.length)return;
+    if(!products.length){
+      setInventoryTableCleared(true);
+      clearInventoryUiTables();
+      return;
+    }
+    setInventoryTableCleared(false);
     tbody.innerHTML='';
     products.forEach(item=>tbody.appendChild(renderStockLevelRow(item)));
     refreshEnhancedTable(tbody.closest('table'));
@@ -2383,6 +2421,25 @@ async function loadStockLevelsFromServer(){
     console.warn('Database stock levels failed:',err);
   }finally{
     stockLevelsLoading=false;
+  }
+}
+
+async function clearInventoryTable(){
+  const tbody=document.getElementById('stock-level-tbody');
+  if(!tbody)return;
+  if(!window.confirm('Clear the inventory table? This removes Item Master products, stock mappings, stock movements, and valuation layers. Purchase records remain unchanged.'))return;
+  stockLevelsServerRefreshPaused=true;
+  try{
+    await moduleApi('/inventory/stock-levels',{method:'DELETE'});
+    setInventoryTableCleared(true);
+    clearInventoryUiTables();
+    toast('Inventory table cleared','ok');
+    audit('Cleared inventory table','Inventory','Deleted');
+  }catch(err){
+    console.warn('Clear inventory table failed:',err);
+    toast('Could not clear inventory table','warn');
+  }finally{
+    stockLevelsServerRefreshPaused=false;
   }
 }
 
@@ -2470,6 +2527,11 @@ function purchaseLineQuantity(line={}){
 
 function purchaseLinesTotalQuantity(lines=[]){
   return (Array.isArray(lines)?lines:[]).reduce((sum,line)=>sum+purchaseLineQuantity(line),0);
+}
+
+function purchaseRecordQuantity(purchase={}){
+  const lineQuantity=purchaseLinesTotalQuantity(purchase.lines);
+  return lineQuantity||parseAmount(purchase.items||purchase.quantity||purchase.qty||0);
 }
 
 function addStockItemAliases(map,item){
@@ -2832,16 +2894,18 @@ function saveExpense(status='Pending'){
 function buildPurchaseRecordRow(purchase){
   const ref=purchase?.ref||purchase?.invoice_no||purchase?.reference;
   if(!ref)return null;
-  purchaseRecordCache.set(String(ref),{...purchase,ref});
+  const quantity=purchaseRecordQuantity(purchase);
+  const normalizedPurchase={...purchase,ref,items:quantity};
+  purchaseRecordCache.set(String(ref),normalizedPurchase);
   const row=document.createElement('tr');
   row.dataset.serverRecord='purchaseRecords';
   row.dataset.purchaseRef=String(ref);
-  row.dataset.purchaseRecord=JSON.stringify({...purchase,ref});
+  row.dataset.purchaseRecord=JSON.stringify(normalizedPurchase);
   const status=purchase.status||'Draft';
   const statusClass=status==='Paid'?'b-g':status==='Received'?'b-b':status.includes('Payment')?'b-a':'b-gray';
   const source=String(purchase.source||'Manual');
   const sourceClass=source.toLowerCase().includes('ai')?'b-p':'b-gray';
-  row.innerHTML=`<td class="mono">${escapeHtml(ref)}</td><td>${escapeHtml(purchaseRecordProductSummary(purchase))}</td><td>${escapeHtml(purchase.supplier||'-')}</td><td>${escapeHtml(purchase.date||'-')}</td><td>${escapeHtml(purchase.location||'-')}</td><td class="mono">${Number(purchase.items||0)}</td><td class="mono">${Number(purchase.net_amount||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(purchase.tax_amount||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(purchase.shipping||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(purchase.total||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(purchase.paid||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(purchase.due||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td><span class="b ${sourceClass}">${escapeHtml(source)}</span></td><td><span class="b ${statusClass}">${escapeHtml(status)}</span></td><td data-action-col="1"><div class="flx"><button class="btn btn-g btn-sm" type="button" onclick="editPurchaseRecord(this)">Edit</button><button class="btn btn-g btn-sm" type="button" onclick="openPurchaseRecordPreview(this)">View</button></div></td>`;
+  row.innerHTML=`<td class="mono">${escapeHtml(ref)}</td><td>${escapeHtml(purchaseRecordProductSummary(normalizedPurchase))}</td><td>${escapeHtml(normalizedPurchase.supplier||'-')}</td><td>${escapeHtml(normalizedPurchase.date||'-')}</td><td>${escapeHtml(normalizedPurchase.location||'-')}</td><td class="mono">${Number(quantity||0).toLocaleString('en-AE',{maximumFractionDigits:4})}</td><td class="mono">${Number(normalizedPurchase.net_amount||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(normalizedPurchase.tax_amount||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(normalizedPurchase.shipping||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(normalizedPurchase.total||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(normalizedPurchase.paid||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(normalizedPurchase.due||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td><span class="b ${sourceClass}">${escapeHtml(source)}</span></td><td><span class="b ${statusClass}">${escapeHtml(status)}</span></td><td data-action-col="1"><div class="row-actions"><button class="icon-btn edit" type="button" title="Edit" aria-label="Edit purchase" onclick="editPurchaseRecord(this)">${editIconSvg()}</button><button class="icon-btn view" type="button" title="View" aria-label="View purchase" onclick="openPurchaseRecordPreview(this)">${viewIconSvg()}</button><button class="icon-btn danger" type="button" title="Delete" aria-label="Delete purchase" onclick="deletePurchaseRecord(this)">${deleteIconSvg()}</button></div></td>`;
   return row;
 }
 
@@ -4896,6 +4960,41 @@ function openAddCustomerFromInvoice(){
   showM('m-customer');
 }
 
+function deletePurchaseRecord(btn){
+  const row=btn.closest('tr');
+  const table=row?.closest('table');
+  if(!row||!table)return;
+  const record=purchaseRecordFromRow(row);
+  const ref=record?.ref||record?.invoice_no||record?.reference||row.children[0]?.textContent.trim();
+  if(!ref)return;
+  const status=String(record.status||'').toLowerCase();
+  if(status.includes('paid')){
+    toast(`Cannot delete ${ref}: paid purchases are linked to payment history.`,'warn');
+    audit('Delete blocked',ref,'Paid purchase');
+    return;
+  }
+  if(!window.confirm(`Delete purchase record ${ref}? This also removes its source transaction and stock movement from the database.`))return;
+  row.remove();
+  purchaseRecordCache.delete(String(ref));
+  purchaseRecordsTotal=Math.max(0,purchaseRecordsTotal-1);
+  const tbody=table.tBodies?.[0];
+  if(tbody&&tbody.querySelectorAll('tr:not([data-empty-state])').length===0){
+    emptyTableMessage(tbody,'No purchase records in database yet.');
+  }
+  refreshEnhancedTable(table);
+  updatePurchaseRecordControls(purchaseRecordsTotal,purchaseRecordCache.size);
+  syncStockLevelsFromProducts();
+  deleteServer('purchaseRecords',record,{throwOnError:true})
+    .then(()=>{
+      loadStockLevelsFromServer();
+      toast(`Purchase ${ref} deleted`,'ok');
+    })
+    .catch(()=>{
+      toast(`Purchase ${ref} removed on screen, database delete failed`,'warn');
+    });
+  audit('Deleted purchase record',ref,'Deleted');
+}
+
 function openAddCustomerFromQuotation(){
   customerReturnToQuotation=true;
   customerReturnToInvoice=false;
@@ -5394,6 +5493,7 @@ function purchaseRecordFromExtractedInvoice(inv){
   const total=Number(inv.total||0);
   const status=String(inv.status||'Review');
   const lines=Array.isArray(inv.lines)?inv.lines:[];
+  const itemQuantity=purchaseLinesTotalQuantity(lines)||lines.length||1;
   const paid=Number(inv.paid||0);
   return {
     ref:inv.invoice_no,
@@ -5402,7 +5502,7 @@ function purchaseRecordFromExtractedInvoice(inv){
     date:inv.date||'',
     location:'Dubai HQ',
     pay_term:inv.pay_term||'',
-    items:lines.length||1,
+    items:itemQuantity,
     net_amount:Number(inv.net_amount||inv.subtotal||0),
     discount:discountAmountFromExtractedInvoice(inv),
     tax_amount:Number(inv.tax_amount||inv.vat_amount||0),
@@ -5504,6 +5604,7 @@ async function storeExtractedPurchaseRecords(){
         console.warn('Purchase AI vendor sync failed:',vendorErr);
       }
       await savePurchaseRecordsInChunks(recordsToSave.map(item=>item.record));
+      setInventoryTableCleared(false);
       recordsToSave.forEach(item=>{
         const oldRow=existingRows.get(item.refKey);
         if(oldRow)oldRow.remove();
@@ -6832,6 +6933,7 @@ async function saveManualPurchase(){
     [...document.querySelectorAll('#purchase-record-tbody tr')].find(row=>row.children[0]?.textContent.trim()===manualPurchaseEditingRef)?.remove();
     purchaseRecordCache.delete(manualPurchaseEditingRef);
   }
+  setInventoryTableCleared(false);
   stockLevelsServerRefreshPaused=true;
   const upsert=upsertPurchaseRecordLocal(record,{replace:wasEditing});
   const savedRecord=upsert.record;
@@ -7060,7 +7162,7 @@ function savePurchasePreviewEdit(){
     payment_method:document.getElementById('pv-pay-method')?.value||'',
     payment_account:document.getElementById('pv-pay-account')?.value||'',
     notes:document.getElementById('pv-notes')?.value||'',
-    items:lines.length,
+    items:purchaseLinesTotalQuantity(lines)||lines.length,
     net_amount:totals.net,
     tax_amount:totals.vat,
     shipping:totals.shipping,
@@ -7070,6 +7172,7 @@ function savePurchasePreviewEdit(){
     lines
   };
   if(currentPurchaseViewRef&&currentPurchaseViewRef!==ref)purchaseRecordCache.delete(currentPurchaseViewRef);
+  setInventoryTableCleared(false);
   purchaseRecordCache.set(ref,record);
   renderPurchaseRecordWindow();
   syncStockLevelsFromProducts();
@@ -7380,6 +7483,7 @@ function saveProd(){
   const shouldFillInvoice=productReturnToInvoice;
   const targetLine=productTargetLine;
   const row=document.createElement('tr');
+  setInventoryTableCleared(false);
   const vatText=vat.includes('0')&&!vat.includes('5')?'0% Zero':vat.includes('Exempt')?'Exempt':'5%';
   const vatClass=vatText==='5%'?'b-b':'b-t';
   row.dataset.reorderLevel=reorderLevel;

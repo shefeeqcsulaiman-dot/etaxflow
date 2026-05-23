@@ -59,7 +59,8 @@ def list_mappings(db: Session = Depends(get_db), current_user: User = Depends(ge
 
 @router.get("/inventory/stock-levels")
 def list_stock_levels(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> list[dict[str, object]]:
-    backfill_purchase_stock_movements(db, current_user)
+    if not inventory_backfill_disabled(db, current_user.company_id):
+        backfill_purchase_stock_movements(db, current_user)
     rows = (
         db.query(
             StockProductMapping,
@@ -87,6 +88,60 @@ def list_stock_levels(db: Session = Depends(get_db), current_user: User = Depend
         }
         for mapping, current_stock in rows
     ]
+
+
+@router.delete("/inventory/stock-levels")
+def clear_stock_levels(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> dict[str, object]:
+    company_id = current_user.company_id
+    movements = db.query(StockMovement).filter(StockMovement.company_id == company_id).delete(synchronize_session=False)
+    layers = db.query(InventoryValuationLayer).filter(InventoryValuationLayer.company_id == company_id).delete(synchronize_session=False)
+    mappings = db.query(StockProductMapping).filter(StockProductMapping.company_id == company_id).delete(synchronize_session=False)
+    products = (
+        db.query(AppDataRecord)
+        .filter(AppDataRecord.company_id == company_id, AppDataRecord.collection == "products")
+        .delete(synchronize_session=False)
+    )
+    set_inventory_backfill_disabled(db, company_id)
+    db.commit()
+    return {
+        "ok": True,
+        "deleted": {
+            "stock_movements": movements,
+            "inventory_valuation_layers": layers,
+            "stock_product_mappings": mappings,
+            "products": products,
+        },
+    }
+
+
+def inventory_backfill_disabled(db: Session, company_id: str) -> bool:
+    marker = (
+        db.query(AppDataRecord)
+        .filter(
+            AppDataRecord.company_id == company_id,
+            AppDataRecord.collection == "inventorySettings",
+            AppDataRecord.record_key == "stock_backfill_disabled",
+        )
+        .first()
+    )
+    return bool(marker)
+
+
+def set_inventory_backfill_disabled(db: Session, company_id: str) -> None:
+    marker = (
+        db.query(AppDataRecord)
+        .filter(
+            AppDataRecord.company_id == company_id,
+            AppDataRecord.collection == "inventorySettings",
+            AppDataRecord.record_key == "stock_backfill_disabled",
+        )
+        .first()
+    )
+    payload = json.dumps({"disabled": True, "reason": "Inventory stock table cleared by user"})
+    if marker:
+        marker.payload = payload
+    else:
+        db.add(AppDataRecord(company_id=company_id, collection="inventorySettings", record_key="stock_backfill_disabled", payload=payload))
 
 
 def backfill_purchase_stock_movements(db: Session, current_user: User) -> None:

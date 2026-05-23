@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from app.models import InventoryValuationLayer, StockMovement, StockProductMapping
+from app.models import AppDataRecord, InventoryValuationLayer, StockMovement, StockProductMapping
 
 
 def test_inventory_unit_conversion_records(client, auth_headers):
@@ -81,6 +81,26 @@ def test_purchase_record_syncs_line_quantity_to_stock_tables(client, auth_header
     assert stock_levels.status_code == 200
     stock_level = next(row for row in stock_levels.json() if row["code"] == "PAPER-A4")
     assert Decimal(str(stock_level["current_stock"])) == Decimal("8.00")
+
+    product = client.post(
+        "/api/v1/app-data?action=save",
+        headers=auth_headers,
+        json={
+            "collection": "products",
+            "record": {"code": "INV-CLEAR", "name": "Inventory Clear Item", "category": "QA", "unit": "PCS"},
+        },
+    )
+    assert product.status_code == 200
+
+    cleared = client.delete("/api/v1/inventory/stock-levels", headers=auth_headers)
+    assert cleared.status_code == 200
+    assert cleared.json()["deleted"]["stock_movements"] >= 1
+    assert cleared.json()["deleted"]["products"] >= 1
+
+    after_clear = client.get("/api/v1/inventory/stock-levels", headers=auth_headers)
+    assert after_clear.status_code == 200
+    assert after_clear.json() == []
+    assert db.query(AppDataRecord).filter(AppDataRecord.collection == "products").count() == 0
 
 
 def test_exception_center_accepts_manual_exception(client, auth_headers):
