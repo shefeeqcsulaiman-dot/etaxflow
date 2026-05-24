@@ -417,7 +417,7 @@
           <div class="fg"><label class="fl">Reference No.</label><input class="fi mono" id="inv-ref" placeholder="REF-0001"></div>
         </div>
         <div class="fr2">
-            <div class="fg"><label class="fl">Customer Name</label><div class="field-action-row"><input class="fi" id="inv-cust" list="invoice-customer-options" placeholder="Select or type customer" dir="auto" onfocus="refreshInvoiceCustomerOptions()" onchange="applyInvoiceCustomerSelection()"><button class="btn btn-g btn-sm" type="button" onclick="openAddCustomerFromInvoice()">+ Add</button></div><datalist id="invoice-customer-options"></datalist></div>
+            <div class="fg"><label class="fl">Customer Name</label><div class="field-action-row"><input class="fi" id="inv-cust" list="invoice-customer-options" placeholder="Select or type customer" dir="auto" onfocus="refreshInvoiceCustomerOptions()" oninput="applyInvoiceCustomerSelection()" onchange="applyInvoiceCustomerSelection()"><button class="btn btn-g btn-sm" type="button" onclick="openAddCustomerFromInvoice()">+ Add</button></div><datalist id="invoice-customer-options"></datalist></div>
           <div class="fg"><label class="fl">Customer TRN</label><input class="fi mono" id="inv-ctrn" placeholder="15-digit TRN"></div>
         </div>
         <div class="fg"><label class="fl">Customer Address</label><input class="fi" id="inv-caddr" placeholder="Billing address" dir="auto"></div>

@@ -2283,7 +2283,9 @@ function applyInvoiceCustomerSelection(){
   const match=invoiceCustomerRecords().find(customer=>customer.name.toLowerCase()===value);
   if(!match)return;
   const trn=document.getElementById('inv-ctrn');
+  const address=document.getElementById('inv-caddr');
   if(trn)trn.value=match.trn||'';
+  if(address)address.value=match.address||'';
 }
 
 function refreshQuotationCustomerOptions(){
@@ -4515,18 +4517,36 @@ function invoicePdfFilename(inv){
   return `${String(inv?.invoice_no||'invoice').replace(/[^a-z0-9_-]+/gi,'-')}.pdf`;
 }
 
+function invoiceViewPrintHtml(inv=currentInvoiceForShare()){
+  renderSalesInvoicePreview(inv);
+  const body=document.getElementById('sales-view-body');
+  const invoiceHtml=body?.innerHTML||invoicePdfHtml(inv);
+  const title=escapeHtml(inv?.invoice_no||'Invoice');
+  return `<!doctype html><html><head><meta charset="utf-8"><title>${title} - TaxFlow</title>
+    <link rel="stylesheet" href="/taxflow/src/styles.css">
+    <style>
+      body{margin:0;background:#fff;color:#172033;padding:24px;height:auto;overflow:auto;}
+      .invoice-print-shell{max-width:980px;margin:0 auto;}
+      .invoice-sheet{box-shadow:none!important;border-color:#d9dee8!important;background:#fff!important;}
+      @media print{
+        body{padding:0;print-color-adjust:exact;-webkit-print-color-adjust:exact;}
+        .invoice-print-shell{max-width:none;margin:0;}
+        .invoice-sheet{border:0!important;border-radius:0!important;}
+      }
+    </style></head><body><main class="invoice-print-shell">${invoiceHtml}</main><script>window.onload=()=>setTimeout(()=>window.print(),350);<\/script></body></html>`;
+}
+
 function downloadInvoicePdf(inv=currentInvoiceForShare()){
-  const blob=makeSimplePdfBlob(invoicePdfTextLines(inv));
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');
-  a.href=url;
-  a.download=invoicePdfFilename(inv);
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(()=>URL.revokeObjectURL(url),1000);
-  toast('Invoice PDF downloaded','ok');
-  audit('Downloaded invoice PDF',inv?.invoice_no||'Draft','Downloaded');
+  const printWindow=window.open('','_blank','width=980,height=780');
+  if(!printWindow){
+    toast('Allow popups to open the invoice PDF view','warn');
+    return;
+  }
+  printWindow.document.open();
+  printWindow.document.write(invoiceViewPrintHtml(inv));
+  printWindow.document.close();
+  toast('PDF view opened. Choose Save as PDF to export.','ok');
+  audit('Opened invoice PDF view',inv?.invoice_no||'Draft','Exported');
 }
 
 function downloadCurrentInvoicePdf(){
@@ -4867,11 +4887,41 @@ function saveDraftInvoice(options={}){
   if(saved){
     audit(options.auditAction||'Saved draft sales invoice',inv.invoice_no,'Saved');
     toast(options.toast||'Invoice saved to register','ok');
+    clearDraftInvoiceForm();
   }else{
     toast(`Invoice ${inv.invoice_no} is already in the register`,'warn');
   }
   if(options.showRegister!==false)showSalesInvoiceRegister();
   return inv;
+}
+
+function clearDraftInvoiceForm(){
+  const form=document.getElementById('s-create');
+  if(!form)return;
+  form.querySelectorAll('input,textarea').forEach(field=>{
+    if(field.classList.contains('inv-qty'))field.value='1';
+    else if(field.classList.contains('inv-price')||field.classList.contains('inv-amount'))field.value='0.00';
+    else field.value='';
+  });
+  form.querySelectorAll('select').forEach(select=>{select.selectedIndex=0;});
+  const lines=document.getElementById('inv-lines');
+  if(lines){
+    lines.innerHTML='';
+    lineCount=0;
+    const row=addLine();
+    const product=row?.querySelector('.inv-product');
+    const unit=row?.querySelector('.inv-unit');
+    const qty=row?.querySelector('.inv-qty');
+    const price=row?.querySelector('.inv-price');
+    const amount=row?.querySelector('.inv-amount');
+    if(product)product.value='';
+    if(unit)unit.value='PCS';
+    if(qty)qty.value='1';
+    if(price)price.value='0.00';
+    if(amount)amount.value='0.00';
+  }
+  currentSalesInvoice=null;
+  calcLine(null);
 }
 
 function saveAndSendDraftInvoice(){
@@ -5036,8 +5086,10 @@ function saveCustomer(){
   if(shouldFillInvoice){
     const invoiceCustomer=document.getElementById('inv-cust');
     const invoiceTrn=document.getElementById('inv-ctrn');
+    const invoiceAddress=document.getElementById('inv-caddr');
     if(invoiceCustomer)invoiceCustomer.value=name;
     if(invoiceTrn)invoiceTrn.value=trn;
+    if(invoiceAddress)invoiceAddress.value=address;
   }
   if(shouldFillQuotation){
     const quoteCustomer=document.getElementById('quote-customer');
