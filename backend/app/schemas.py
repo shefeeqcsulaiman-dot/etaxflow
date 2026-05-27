@@ -90,6 +90,12 @@ class AccountIn(BaseModel):
     code: str
     name: str
     type: str
+    parent_account_id: str | None = None
+    opening_balance: Decimal = Decimal("0.00")
+    currency: str = "AED"
+    tax_applicable: bool = False
+    is_bank_cash: bool = False
+    is_control_account: bool = False
     is_active: bool = True
 
 
@@ -191,6 +197,147 @@ class PostingJobOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class VoucherTypeIn(BaseModel):
+    name: str
+    code: str
+    prefix: str
+    auto_numbering: bool = True
+    default_debit_account_id: str | None = None
+    default_credit_account_id: str | None = None
+    approval_required: bool = True
+    affects_cash_bank: bool = False
+    affects_vat: bool = False
+    status: str = "active"
+
+
+class VoucherTypeOut(VoucherTypeIn):
+    id: str
+
+    model_config = {"from_attributes": True}
+
+
+class VoucherLineIn(BaseModel):
+    account_id: str
+    debit: Decimal = Field(default=0, ge=0)
+    credit: Decimal = Field(default=0, ge=0)
+    party: str | None = None
+    cost_center: str | None = None
+    narration: str | None = None
+
+
+class VoucherCreate(BaseModel):
+    voucher_type_id: str
+    voucher_no: str | None = None
+    voucher_date: datetime | None = None
+    party: str | None = None
+    cost_center: str | None = None
+    narration: str | None = None
+    lines: list[VoucherLineIn]
+
+
+class VoucherLineOut(VoucherLineIn):
+    id: str
+
+    model_config = {"from_attributes": True}
+
+
+class VoucherOut(BaseModel):
+    id: str
+    voucher_type_id: str
+    voucher_no: str
+    voucher_date: datetime
+    party: str | None
+    cost_center: str | None
+    narration: str | None
+    status: str
+    posted_journal_id: str | None
+    lines: list[VoucherLineOut] = []
+
+    model_config = {"from_attributes": True}
+
+
+class GeneralLedgerEntryOut(BaseModel):
+    id: str
+    entry_date: datetime
+    voucher_no: str
+    voucher_type: str
+    account_id: str
+    debit: Decimal
+    credit: Decimal
+    balance: Decimal
+    party: str | None
+    cost_center: str | None
+    narration: str | None
+
+    model_config = {"from_attributes": True}
+
+
+class PaymentCreate(BaseModel):
+    payment_no: str | None = None
+    payment_date: datetime | None = None
+    payment_mode: str = "bank"
+    cash_bank_account_id: str
+    debit_account_id: str
+    payee_type: str | None = None
+    payee_name: str
+    amount: Decimal = Field(gt=0)
+    reference_no: str | None = None
+    narration: str | None = None
+    attachment: str | None = None
+    post: bool = True
+
+
+class PaymentOut(BaseModel):
+    id: str
+    payment_no: str
+    payment_date: datetime
+    payment_mode: str
+    cash_bank_account_id: str
+    debit_account_id: str
+    payee_type: str | None
+    payee_name: str
+    amount: Decimal
+    reference_no: str | None
+    narration: str | None
+    attachment: str | None
+    status: str
+    voucher_id: str | None
+
+    model_config = {"from_attributes": True}
+
+
+class ReceiptCreate(BaseModel):
+    receipt_no: str | None = None
+    receipt_date: datetime | None = None
+    receipt_mode: str = "bank"
+    cash_bank_account_id: str
+    credit_account_id: str
+    received_from: str
+    amount: Decimal = Field(gt=0)
+    reference_no: str | None = None
+    narration: str | None = None
+    attachment: str | None = None
+    post: bool = True
+
+
+class ReceiptOut(BaseModel):
+    id: str
+    receipt_no: str
+    receipt_date: datetime
+    receipt_mode: str
+    cash_bank_account_id: str
+    credit_account_id: str
+    received_from: str
+    amount: Decimal
+    reference_no: str | None
+    narration: str | None
+    attachment: str | None
+    status: str
+    voucher_id: str | None
+
+    model_config = {"from_attributes": True}
+
+
 class TaxCodeIn(BaseModel):
     code: str
     name: str
@@ -213,6 +360,129 @@ class TaxLineOut(BaseModel):
     tax_amount: Decimal
     period: str
     created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class VatReturnCreate(BaseModel):
+    period: str
+    adjustments: Decimal = Decimal("0.00")
+    filing_status: str = "draft"
+    fta_reference_no: str | None = None
+    attachment: str | None = None
+
+
+class VatReturnOut(BaseModel):
+    id: str
+    period: str
+    sales_taxable_amount: Decimal
+    output_vat: Decimal
+    purchase_taxable_amount: Decimal
+    input_vat: Decimal
+    adjustments: Decimal
+    net_vat: Decimal
+    filing_status: str
+    filed_date: datetime | None
+    fta_reference_no: str | None
+    attachment: str | None
+
+    model_config = {"from_attributes": True}
+
+
+class CorporateTaxReturnCreate(BaseModel):
+    tax_period: str
+    accounting_profit: Decimal = Decimal("0.00")
+    non_deductible_expenses: Decimal = Decimal("0.00")
+    exempt_income: Decimal = Decimal("0.00")
+    tax_loss_adjustment: Decimal = Decimal("0.00")
+    tax_rate: Decimal = Decimal("9.00")
+    filing_status: str = "draft"
+    reference_no: str | None = None
+    attachment: str | None = None
+
+
+class CorporateTaxReturnOut(BaseModel):
+    id: str
+    tax_period: str
+    accounting_profit: Decimal
+    non_deductible_expenses: Decimal
+    exempt_income: Decimal
+    tax_loss_adjustment: Decimal
+    taxable_income: Decimal
+    tax_rate: Decimal
+    corporate_tax_payable: Decimal
+    filing_status: str
+    filed_date: datetime | None
+    reference_no: str | None
+    attachment: str | None
+
+    model_config = {"from_attributes": True}
+
+
+class BankAccountCreate(BaseModel):
+    account_id: str
+    bank_name: str
+    iban: str | None = None
+    account_number: str | None = None
+    currency: str = "AED"
+    status: str = "active"
+
+
+class BankAccountOut(BankAccountCreate):
+    id: str
+
+    model_config = {"from_attributes": True}
+
+
+class BankStatementLineCreate(BaseModel):
+    bank_account_id: str
+    statement_date: str
+    transaction_date: str
+    reference_no: str | None = None
+    cheque_no: str | None = None
+    narration: str | None = None
+    party_name: str | None = None
+    debit: Decimal = Field(default=0, ge=0)
+    credit: Decimal = Field(default=0, ge=0)
+
+
+class BankStatementLineOut(BankStatementLineCreate):
+    id: str
+    status: str
+
+    model_config = {"from_attributes": True}
+
+
+class BankMatchCreate(BaseModel):
+    statement_line_id: str
+    ledger_entry_id: str
+    match_method: str = "manual"
+    difference: Decimal = Decimal("0.00")
+
+
+class BankMatchOut(BaseModel):
+    id: str
+    bank_account_id: str
+    statement_line_id: str | None
+    ledger_entry_id: str | None
+    match_status: str
+    match_method: str
+    difference: Decimal
+    confirmed_at: datetime | None
+
+    model_config = {"from_attributes": True}
+
+
+class PeriodLockIn(BaseModel):
+    module: str
+    period: str
+    status: str = "locked"
+    reason: str | None = None
+
+
+class PeriodLockOut(PeriodLockIn):
+    id: str
+    locked_at: datetime | None
 
     model_config = {"from_attributes": True}
 

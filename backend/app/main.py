@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.database import Base, SessionLocal, engine
-from app.models import Account, AuditLog, Company, Employee, ItemUnit, ItemUnitConversion, StockProductMapping, TaxCode, User, Warehouse
+from app.models import Account, Company, TaxCode, User, VoucherType
 from app.routers import accounting, ai, app_data, audit, auth, companies, corporate_accounting, documents, events, exception_center, inventory, invoices, jobs, module_records, payroll, reports, source_transactions, tax
 from app.security import hash_password
 
@@ -90,6 +90,19 @@ def ensure_schema_updates() -> None:
                 connection.execute(
                     text("CREATE UNIQUE INDEX IF NOT EXISTS uq_invoice_company_number ON invoices (company_id, invoice_number)")
                 )
+        if "accounts" in table_names:
+            existing_columns = {column["name"] for column in inspector.get_columns("accounts")}
+            required_columns = {
+                "parent_account_id": "VARCHAR(36)",
+                "opening_balance": "NUMERIC(12, 2) DEFAULT 0",
+                "currency": "VARCHAR(10) DEFAULT 'AED'",
+                "tax_applicable": "BOOLEAN DEFAULT 0",
+                "is_bank_cash": "BOOLEAN DEFAULT 0",
+                "is_control_account": "BOOLEAN DEFAULT 0",
+            }
+            for column_name, column_type in required_columns.items():
+                if column_name not in existing_columns:
+                    connection.execute(text(f"ALTER TABLE accounts ADD COLUMN {column_name} {column_type}"))
 
 
 def seed_initial_data() -> None:
@@ -97,9 +110,11 @@ def seed_initial_data() -> None:
     try:
         company = db.query(Company).filter(Company.trn == "100000000000003").first()
         if not company:
-            company = Company(name="TaxFlow UAE LLC", trn="100000000000003")
+            company = Company(name="Company", trn="100000000000003")
             db.add(company)
             db.flush()
+        else:
+            company.name = "Company"
 
         user = db.query(User).filter(User.email == "admin@taxflowapp.com").first()
         legacy_user = db.query(User).filter(User.email == "admin@taxflow.local").first()
@@ -111,17 +126,18 @@ def seed_initial_data() -> None:
                 user = User(
                     company_id=company.id,
                     email="admin@taxflowapp.com",
-                    full_name="Sara Ahmed",
+                    full_name="Administrator",
                     role="admin",
                 )
                 db.add(user)
 
-        user.full_name = "Sara Ahmed"
+        user.full_name = "Administrator"
         user.role = "admin"
         user.password_hash = hash_password("admin123")
         user.company_id = company.id
 
         seed_accounts(db, company.id)
+        seed_voucher_types(db, company.id)
         seed_tax_codes(db, company.id)
         db.commit()
     finally:
@@ -130,21 +146,52 @@ def seed_initial_data() -> None:
 
 def seed_accounts(db: Session, company_id: str) -> None:
     accounts = [
-        ("1000", "Cash and Bank", "asset"),
-        ("1100", "Accounts Receivable", "asset"),
-        ("1200", "Inventory", "asset"),
-        ("2100", "Accounts Payable", "liability"),
-        ("2200", "VAT Output Payable", "liability"),
-        ("2210", "VAT Input Recoverable", "asset"),
-        ("3000", "Sales Income", "revenue"),
-        ("4000", "Purchases", "expense"),
-        ("5000", "Cost of Goods Sold", "expense"),
-        ("6000", "Salary Expense", "expense"),
+        ("1000", "Cash and Bank", "asset", True, True),
+        ("1100", "Accounts Receivable", "asset", False, True),
+        ("1200", "Inventory", "asset", False, True),
+        ("2100", "Accounts Payable", "liability", False, True),
+        ("2200", "VAT Output Payable", "liability", False, True),
+        ("2210", "VAT Input Recoverable", "asset", False, True),
+        ("2300", "Corporate Tax Payable", "liability", False, True),
+        ("3000", "Sales Income", "sales", False, False),
+        ("4000", "Purchases", "purchase", False, False),
+        ("5000", "Cost of Goods Sold", "direct expense", False, False),
+        ("5100", "Corporate Tax Expense", "indirect expense", False, False),
+        ("6000", "Salary Expense", "indirect expense", False, False),
     ]
-    for code, name, account_type in accounts:
+    for code, name, account_type, is_bank_cash, is_control in accounts:
         account = db.query(Account).filter(Account.company_id == company_id, Account.code == code).first()
         if not account:
-            db.add(Account(company_id=company_id, code=code, name=name, type=account_type))
+            db.add(Account(company_id=company_id, code=code, name=name, type=account_type, is_bank_cash=is_bank_cash, is_control_account=is_control))
+
+
+def seed_voucher_types(db: Session, company_id: str) -> None:
+    rows = [
+        ("Payment Voucher", "PAY", "PAY", True, True),
+        ("Receipt Voucher", "RCT", "RCT", True, True),
+        ("Journal Voucher", "JRN", "JRN", True, False),
+        ("Sales Voucher", "SAL", "SAL", True, True),
+        ("Purchase Voucher", "PUR", "PUR", True, True),
+        ("Contra Voucher", "CON", "CON", True, False),
+        ("Debit Note", "DN", "DN", True, True),
+        ("Credit Note", "CN", "CN", True, True),
+        ("Adjustment Voucher", "ADJ", "ADJ", True, True),
+        ("Opening Balance Voucher", "OB", "OB", True, False),
+    ]
+    for name, code, prefix, approval_required, affects_vat in rows:
+        voucher_type = db.query(VoucherType).filter(VoucherType.company_id == company_id, VoucherType.code == code).first()
+        if not voucher_type:
+            db.add(
+                VoucherType(
+                    company_id=company_id,
+                    name=name,
+                    code=code,
+                    prefix=prefix,
+                    approval_required=approval_required,
+                    affects_cash_bank=code in {"PAY", "RCT", "CON"},
+                    affects_vat=affects_vat,
+                )
+            )
 
 
 def seed_tax_codes(db: Session, company_id: str) -> None:
@@ -158,107 +205,6 @@ def seed_tax_codes(db: Session, company_id: str) -> None:
         tax_code = db.query(TaxCode).filter(TaxCode.company_id == company_id, TaxCode.code == code).first()
         if not tax_code:
             db.add(TaxCode(company_id=company_id, code=code, name=name, rate=rate, recoverable=recoverable, reporting_box=box))
-
-
-def seed_inventory(db: Session, company_id: str) -> None:
-    warehouse = db.query(Warehouse).filter(Warehouse.company_id == company_id, Warehouse.name == "Main Store").first()
-    if not warehouse:
-        db.add(Warehouse(company_id=company_id, name="Main Store", location="Dubai HQ"))
-    mapping = db.query(StockProductMapping).filter(StockProductMapping.company_id == company_id, StockProductMapping.sku == "PRD-001").first()
-    if not mapping:
-        db.add(
-            StockProductMapping(
-                company_id=company_id,
-                sku="PRD-001",
-                name="Steel Rods 12mm",
-                sales_account_code="3000",
-                purchase_account_code="4000",
-                inventory_account_code="1200",
-                tax_code="VAT5",
-                reorder_level=50,
-            )
-        )
-    item_units = [
-        ("PRD-001", "PCS", "Pieces", "1.0000", True, False, True),
-        ("PRD-001", "BOX", "Box", "12.0000", False, True, False),
-    ]
-    for item_code, unit_code, unit_name, factor, is_base, purchase_default, sales_default in item_units:
-        unit = (
-            db.query(ItemUnit)
-            .filter(ItemUnit.company_id == company_id, ItemUnit.item_code == item_code, ItemUnit.unit_code == unit_code)
-            .first()
-        )
-        if not unit:
-            db.add(
-                ItemUnit(
-                    company_id=company_id,
-                    item_code=item_code,
-                    unit_code=unit_code,
-                    unit_name=unit_name,
-                    conversion_factor=factor,
-                    is_base_unit=is_base,
-                    purchase_default=purchase_default,
-                    sales_default=sales_default,
-                )
-            )
-    conversion = (
-        db.query(ItemUnitConversion)
-        .filter(
-            ItemUnitConversion.company_id == company_id,
-            ItemUnitConversion.item_code == "PRD-001",
-            ItemUnitConversion.from_unit_code == "BOX",
-            ItemUnitConversion.to_unit_code == "PCS",
-        )
-        .first()
-    )
-    if not conversion:
-        db.add(
-            ItemUnitConversion(
-                company_id=company_id,
-                item_code="PRD-001",
-                from_unit_code="BOX",
-                to_unit_code="PCS",
-                conversion_factor="12.0000",
-            )
-        )
-
-
-def seed_employees(db: Session, company_id: str) -> None:
-    employees = [
-        ("EMP-001", "Sara Al Mansouri", "Management", "General Manager", "22000.00", "AE070331234567890123456", "WPS-001"),
-        ("EMP-002", "Ahmed Rashid", "Operations", "Warehouse Manager", "8500.00", "AE150331234567890123456", "WPS-002"),
-        ("EMP-003", "Rania Abboud", "Finance", "Accountant", "7200.00", None, "WPS-003"),
-        ("EMP-004", "Mohamed Jaber", "Sales", "Sales Executive", "6800.00", "AE460331234567890123456", "WPS-004"),
-    ]
-    for employee_no, full_name, department, designation, salary, iban, wps_id in employees:
-        employee = db.query(Employee).filter(Employee.company_id == company_id, Employee.employee_no == employee_no).first()
-        if not employee:
-            db.add(
-                Employee(
-                    company_id=company_id,
-                    employee_no=employee_no,
-                    full_name=full_name,
-                    department=department,
-                    designation=designation,
-                    basic_salary=salary,
-                    iban=iban,
-                    wps_id=wps_id,
-                )
-            )
-
-
-def seed_audit(db: Session, company_id: str, user_id: str) -> None:
-    exists = db.query(AuditLog).filter(AuditLog.company_id == company_id, AuditLog.action == "initial_data_seeded").first()
-    if not exists:
-        db.add(
-            AuditLog(
-                company_id=company_id,
-                user_id=user_id,
-                module="system",
-                action="initial_data_seeded",
-                detail="Seeded TaxFlow production modules and master data",
-            )
-        )
 
 
 app = create_app()

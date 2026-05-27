@@ -4,9 +4,10 @@ from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
 
+from app.accounting_posting import post_source_transaction
 from app.database import get_db
 from app.dependencies import get_current_user
-from app.models import Account, AuditLog, PostingJob, SourceTransaction, SourceTransactionLine, TaxCode, TaxLine, User
+from app.models import Account, AuditLog, PostingJob, SourceTransaction, SourceTransactionLine, User
 from app.schemas import PostingJobOut, SourceTransactionCreate, SourceTransactionOut
 
 
@@ -105,10 +106,22 @@ def approve_source(
     )
     if not transaction:
         raise HTTPException(status_code=404, detail="Source transaction not found")
-    if transaction.status not in {"validated", "approved"}:
+    existing_job = (
+        db.query(PostingJob)
+        .filter(
+            PostingJob.company_id == current_user.company_id,
+            PostingJob.source_id == transaction.id,
+            PostingJob.status == "posted",
+        )
+        .first()
+    )
+    if existing_job:
+        return existing_job
+
+    if transaction.status not in {"validated", "approved", "posted"}:
         validate_source(source_id, db, current_user)
         db.refresh(transaction)
-    if transaction.status != "validated":
+    if transaction.status not in {"validated", "approved"}:
         raise HTTPException(status_code=422, detail=transaction.validation_result or "Source transaction is not valid")
 
     transaction.status = "approved"
@@ -116,18 +129,8 @@ def approve_source(
     transaction.approved_at = datetime.now(timezone.utc)
     job = PostingJob(company_id=current_user.company_id, source_id=transaction.id, status="queued")
     db.add(job)
-    tax_code = db.query(TaxCode).filter(TaxCode.company_id == current_user.company_id, TaxCode.code == "VAT5").first()
-    if transaction.vat:
-        db.add(
-            TaxLine(
-                company_id=current_user.company_id,
-                source_id=transaction.id,
-                tax_code_id=tax_code.id if tax_code else None,
-                direction="output" if transaction.module == "sales" else "input",
-                taxable_amount=transaction.subtotal,
-                tax_amount=transaction.vat,
-            )
-        )
+    db.flush()
+    post_source_transaction(db, job, current_user.id)
     db.add(AuditLog(company_id=current_user.company_id, user_id=current_user.id, module=transaction.module, action="approved", record_id=transaction.id, detail=transaction.reference))
     db.commit()
     db.refresh(job)

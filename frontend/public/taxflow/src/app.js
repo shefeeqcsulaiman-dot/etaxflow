@@ -1,4 +1,4 @@
-const META={dashboard:{t:'Dashboard',s:'Loading dashboard from database',a:'',ao:null},company:{t:'Company Registration',s:'UAE Trade License & FTA Details',a:'Save All',ao:()=>toast('All changes saved','ok')},sales:{t:'Sales & Invoices',s:'Upload - AI Extraction - Validation - Invoices',a:'+ New Invoice',ao:()=>{go('sales');setTimeout(()=>stab(document.querySelectorAll('#page-sales .tab')[4],'s-create'),50)}},purchase:{t:'Purchases',s:'Upload - AI Extraction - Validation',a:'Upload Files',ao:()=>document.getElementById('pur-file').click()},bank:{t:'Bank Accounts',s:'Accounts - Transactions - Reconciliation',a:'+ Add Account',ao:()=>showM('m-bank')},inventory:{t:'Inventory',s:'Stock - Items - Movements',a:'+ Add Item',ao:()=>openInventoryItemModal()},expense:{t:'Expenses',s:'List - Create - Approvals',a:'+ New Expense',ao:()=>{go('expense');setTimeout(()=>stab(document.querySelectorAll('#page-expense .tab')[1],'exp-create'),50)}},accounting:{t:'Accounting',s:'Chart - Journal - Ledger',a:'+ New Entry',ao:()=>showM('m-acc')},reports:{t:'Reports',s:'VAT - P&L - Trial Balance',a:'Export PDF',ao:()=>toast('Exporting report...','info')},settings:{t:'Settings',s:'General - Users - Tax',a:'Save All',ao:()=>toast('Settings saved','ok')},staff:{t:'Staff Management',s:'Attendance - Leave - Corrections - Biometric',a:'+ Add Employee',ao:()=>showM('m-emp')},expert:{t:'Expert Review',s:'Find CA experts - Submit for review',a:'+ New Request',ao:()=>showM('m-newreview')},design:{t:'System Design',s:'Functional Spec - Fields - Validations - API',a:'Export Spec',ao:()=>toast('Exporting FRD to PDF...','info')}};
+const META={dashboard:{t:'Dashboard',s:'Loading dashboard from database',a:'',ao:null},company:{t:'Company Registration',s:'UAE Trade License & FTA Details',a:'Save All',ao:()=>toast('All changes saved','ok')},sales:{t:'Sales & Invoices',s:'Upload - AI Extraction - Validation - Invoices',a:'+ New Invoice',ao:()=>{go('sales');setTimeout(()=>stab(document.querySelectorAll('#page-sales .tab')[4],'s-create'),50)}},purchase:{t:'Purchases',s:'Upload - AI Extraction - Validation',a:'Upload Files',ao:()=>document.getElementById('pur-file').click()},bank:{t:'Bank & Payments',s:'Accounts - transactions - receipts - payments - reconciliation',a:'+ Record Payment',ao:()=>openPaymentModal('Customer Receipt')},inventory:{t:'Inventory',s:'Stock - Items - Movements',a:'+ Add Item',ao:()=>openInventoryItemModal()},expense:{t:'Expenses',s:'List - Create - Approvals',a:'+ New Expense',ao:()=>{go('expense');setTimeout(()=>stab(document.querySelectorAll('#page-expense .tab')[1],'exp-create'),50)}},accounting:{t:'Accounting',s:'Chart - Journal - Ledger',a:'+ New Entry',ao:()=>showM('m-acc')},reports:{t:'Reports',s:'VAT - P&L - Trial Balance',a:'Export PDF',ao:()=>toast('Exporting report...','info')},settings:{t:'Settings',s:'General - Users - Tax',a:'Save All',ao:()=>toast('Settings saved','ok')},staff:{t:'Staff Management',s:'Attendance - Leave - Corrections - Biometric',a:'+ Add Employee',ao:()=>showM('m-emp')},expert:{t:'Expert Review',s:'Find CA experts - Submit for review',a:'+ New Request',ao:()=>showM('m-newreview')},design:{t:'System Design',s:'Functional Spec - Fields - Validations - API',a:'Export Spec',ao:()=>toast('Exporting FRD to PDF...','info')}};
 META.settings={t:'Settings',s:'Company - Users - Tax - Security - Integrations - Invoice Design',a:'Save All',ao:()=>toast('Settings saved','ok')};
 META.payroll={t:'Payroll',s:'Salary run - WPS/SIF - Payslips - Posting',a:'Run Payroll',ao:()=>{go('payroll');setTimeout(()=>runPayroll(),50)}};
 META.sales={t:'Sales & Invoices',s:'Upload - AI Extraction - Validation - Invoices',a:'+ New',ao:()=>openSalesAddChoice()};
@@ -6,7 +6,7 @@ META.quotations={t:'Quotations',s:'Create - share - convert to invoice',a:'+ New
 META.purchase={t:'Purchases',s:'Upload - AI Extraction - Validation - Manual - Settings',a:'Upload Files',ao:()=>document.getElementById('pur-file').click()};
 META.ai={t:'AI Assistant',s:'Ask questions about TaxFlow modules and workflows',a:'Ask AI',ao:()=>askSystemAI()};
 META.bills={t:'Bills',s:'Vendor bills - Purchase orders - Supplier payments',a:'+ New Bill',ao:()=>showM('m-bill')};
-META.payments={t:'Payments',s:'Receipts - Payouts - Gateway settlements',a:'+ Record Payment',ao:()=>openPaymentModal('Customer Receipt')};
+META.payments={t:'Bank & Payments',s:'Accounts - transactions - receipts - payments - reconciliation',a:'+ Record Payment',ao:()=>openPaymentModal('Customer Receipt')};
 META.documents={t:'Documents',s:'Receipts - PDFs - Audit files - Attachments',a:'Upload Document',ao:()=>toast('Choose files to upload...','info')};
 META.notifications={t:'Notifications',s:'Email - WhatsApp - SMS - Push - In-app alerts',a:'+ New Rule',ao:()=>toast('Notification rule builder opened','info')};
 META.rota={t:'Rota Planning',s:'Shift setup - Weekly rota - Coverage - Swap requests',a:'Publish Rota',ao:()=>publishRota()};
@@ -53,6 +53,7 @@ function runPageWarmup(page){
     bindGenericAddActions();
     if(page==='rota'){
       seedDefaultRotaShifts();
+      renderRotaBoards();
       updateRotaStats();
     }
   },500);
@@ -113,6 +114,14 @@ function goBack(){
 }
 
 function go(page){
+  if(page==='payments'){
+    go('bank');
+    setTimeout(()=>{
+      const tab=[...document.querySelectorAll('#page-bank .tab')].find(item=>(item.getAttribute('onclick')||'').includes("'pay-in'"));
+      if(tab)stab(tab,'pay-in');
+    },50);
+    return;
+  }
   if(page==='company'){
     go('settings');
     setTimeout(()=>stab(document.querySelectorAll('#page-settings .tab')[0],'set-company'),50);
@@ -243,6 +252,58 @@ function closeM(id){
     productTargetLine=null;
   }
 }
+
+function ensureAppConfirmModal(){
+  let overlay=document.getElementById('m-app-confirm');
+  if(overlay)return overlay;
+  overlay=document.createElement('div');
+  overlay.className='overlay';
+  overlay.id='m-app-confirm';
+  overlay.innerHTML=`
+    <div class="modal modal-sm app-confirm-modal">
+      <div class="modal-title" id="app-confirm-title">Confirm Action</div>
+      <div class="modal-sub" id="app-confirm-message">Please confirm this action.</div>
+      <div class="modal-foot">
+        <button class="btn btn-g" id="app-confirm-cancel" type="button">Cancel</button>
+        <button class="btn btn-danger" id="app-confirm-ok" type="button">Delete</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  return overlay;
+}
+
+function appConfirm({title='Confirm Action',message='Please confirm this action.',okText='Delete',tone='danger'}={}){
+  const overlay=ensureAppConfirmModal();
+  const ok=overlay.querySelector('#app-confirm-ok');
+  const cancel=overlay.querySelector('#app-confirm-cancel');
+  overlay.querySelector('#app-confirm-title').textContent=title;
+  overlay.querySelector('#app-confirm-message').textContent=message;
+  ok.textContent=okText;
+  ok.className=`btn ${tone==='danger'?'btn-danger':'btn-p'}`;
+  overlay.classList.add('on');
+  return new Promise(resolve=>{
+    const done=value=>{
+      overlay.classList.remove('on');
+      ok.onclick=null;
+      cancel.onclick=null;
+      overlay.onclick=null;
+      resolve(value);
+    };
+    ok.onclick=event=>{
+      event.stopPropagation();
+      done(true);
+    };
+    cancel.onclick=event=>{
+      event.stopPropagation();
+      done(false);
+    };
+    overlay.onclick=event=>{
+      if(event.target===overlay)done(false);
+    };
+    setTimeout(()=>cancel.focus(),30);
+  });
+}
+
 function closeOvBg(e,id){if(e.target.id===id)closeM(id);}
 function saveM(id,msg){closeM(id);toast(msg,'ok');audit(msg.replace(/[?.]/g,'').trim(),id,'Saved');}
 
@@ -372,7 +433,7 @@ function saveEmployee(){
     email:employeeFormValue('emp-email'),
     department:employeeFormValue('emp-department','Management'),
     designation:employeeFormValue('emp-designation','Employee'),
-    supervisor:employeeFormValue('emp-supervisor','Sara Al Mansouri'),
+    supervisor:employeeFormValue('emp-supervisor',''),
     shift:employeeFormValue('emp-shift','09:00-18:00'),
     salary:parseAmount(employeeFormValue('emp-salary','0')),
     contract:employeeFormValue('emp-contract','Full-time'),
@@ -890,7 +951,12 @@ async function inventoryBulkDeleteSelected(tbodyId){
     toast('Stock movements are source history. Use Clear Table to remove inventory history.','warn');
     return;
   }
-  if(!window.confirm(`Delete ${rows.length} selected inventory row(s)?`))return;
+  const confirmed=await appConfirm({
+    title:'Delete Inventory Rows',
+    message:`Delete ${rows.length} selected inventory row(s)?`,
+    okText:'Delete'
+  });
+  if(!confirmed)return;
   let deleted=0;
   let failed=0;
   for(const row of rows){
@@ -1001,7 +1067,14 @@ async function deleteInventoryProductAndMapping({productRow=null,mappingRow=null
     toast(`Cannot delete ${productName}: linked sales returns exist`,'warn');
     return false;
   }
-  if(!skipConfirm&&!window.confirm(`Delete ${productName || productCode || 'this inventory item'} from inventory? This removes the Item Master row and its stock mapping when present.`))return false;
+  if(!skipConfirm){
+    const confirmed=await appConfirm({
+      title:'Delete Inventory Item',
+      message:`Delete ${productName || productCode || 'this inventory item'} from inventory? This removes the Item Master row and its stock mapping when present.`,
+      okText:'Delete'
+    });
+    if(!confirmed)return false;
+  }
   if(button)button.disabled=true;
   try{
     const mappingId=mappingRow?.dataset?.mappingId;
@@ -1474,7 +1547,7 @@ async function syncCompanyFromDatabase(){
 }
 
 async function saveCompanySettingsToDatabase(){
-  const name=readFieldValue('Legal Company Name')||currentCompany?.name||'TaxFlow UAE LLC';
+  const name=readFieldValue('Legal Company Name')||currentCompany?.name||'';
   const trn=(document.getElementById('set-company-trn')?.value||currentCompany?.trn||'').replace(/\D/g,'');
   const country=currentCompany?.country||'United Arab Emirates';
   const response=await authenticatedFetch(`${apiBaseUrl()}/companies/current`,{
@@ -2436,22 +2509,84 @@ function clearStaticDemoData(){
     emptyTableMessage(tbody,'No database records yet.');
   });
   document.querySelectorAll('[data-demo-static="1"]').forEach(node=>node.remove());
+  removeDemoProductRows();
   clearDemoFormDefaults();
+  clearDemoTextNodes();
   clearDemoCardsAndCounters();
   resetDraftEntryDefaults();
 }
 
+const DEMO_TEXT_VALUES=[
+  'Acme Trading LLC',
+  'Acme Trading',
+  'Sara Al Mansouri',
+  'Sara Ahmed',
+  'Ahmed Rashid',
+  'Rania Abboud',
+  'Mohamed Jaber',
+  'Al Hamad Steel',
+  'Dubai Steel Co.',
+  'Gulf Freight',
+  'Office Depot UAE',
+  'UAE Paints Co.',
+  'Gulf Logistics Ltd',
+  'Emirates Supplies',
+  'Al Baraka Trading',
+  'Steel Rods 12mm',
+  'Packaging Box A',
+  'Industrial Oil 5L',
+  'Safety Gloves',
+  'Mohammed Al Hamdan',
+  'Layla Hussain',
+  'Khalid Al Rashidi',
+  'TaxFlow UAE LLC',
+  'Dubai HQ',
+  'Abu Dhabi Warehouse',
+  'Sharjah Sales Office'
+];
+
+function containsDemoText(value){
+  const text=String(value||'');
+  return DEMO_TEXT_VALUES.some(item=>text.toLowerCase().includes(item.toLowerCase()))
+    || /^(INV|PUR|QTN|BILL|PO|RCT)-2024-/i.test(text.trim())
+    || /@acmetrading\.ae/i.test(text)
+    || /100234567800003|100123456700003|DED-2018-84521|AE070331234567890123456|AE150331234567890123456|AE460331234567890123456/i.test(text);
+}
+
 function clearDemoFormDefaults(){
-  const demoOptionText=/^(Al Hamad Steel|Gulf Freight|Office Depot UAE|UAE Paints Co\.|Dubai Steel Co\.|Gulf Logistics Ltd|Emirates Supplies|Al Baraka Trading|Steel Rods 12mm|Packaging Box A|Industrial Oil 5L|Safety Gloves|Sara Al Mansouri|Ahmed Rashid|Rania Abboud|Mohamed Jaber|Dubai HQ|Abu Dhabi Warehouse|Sharjah Sales Office|Tue Evening|Sat Morning|Wed Morning)$/i;
   document.querySelectorAll('select').forEach(select=>{
     [...select.options].forEach(option=>{
-      if(demoOptionText.test(option.textContent.trim()))option.remove();
+      if(containsDemoText(option.textContent.trim())||/^(Tue Evening|Sat Morning|Wed Morning)$/i.test(option.textContent.trim()))option.remove();
     });
     if(select.options.length&&select.selectedIndex<0)select.selectedIndex=0;
   });
-  const demoInputValue=/^(Sara Al Mansouri|INV-2024-\d+|PUR-2024-\d+|QTN-2024-\d+|Steel Rods 12mm|Packaging Box A|Industrial Oil 5L|Safety Gloves)$/i;
-  document.querySelectorAll('input').forEach(input=>{
-    if(demoInputValue.test(String(input.value||'').trim()))input.value='';
+  document.querySelectorAll('input,textarea').forEach(input=>{
+    if(containsDemoText(input.value))input.value='';
+  });
+}
+
+function clearDemoTextNodes(){
+  const root=document.querySelector('.content');
+  if(!root)return;
+  const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT,{
+    acceptNode(node){
+      if(!containsDemoText(node.nodeValue))return NodeFilter.FILTER_REJECT;
+      if(node.parentElement?.closest('script,style'))return NodeFilter.FILTER_REJECT;
+      return NodeFilter.FILTER_ACCEPT;
+    }
+  });
+  const nodes=[];
+  while(walker.nextNode())nodes.push(walker.currentNode);
+  nodes.forEach(node=>{
+    let value=node.nodeValue||'';
+    DEMO_TEXT_VALUES.forEach(item=>{
+      value=value.replace(new RegExp(item.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'gi'),'');
+    });
+    value=value
+      .replace(/\b(INV|PUR|QTN|BILL|PO|RCT)-2024-[\w-]+\b/gi,'')
+      .replace(/[a-z0-9._%+-]+@acmetrading\.ae/gi,'')
+      .replace(/\b(100234567800003|100123456700003|DED-2018-84521|AE070331234567890123456|AE150331234567890123456|AE460331234567890123456)\b/gi,'');
+    node.nodeValue=value;
   });
 }
 
@@ -2648,6 +2783,7 @@ function applyQuotationCustomerSelection(){
 function renderProductRecord(product,options={}){
   const tbody=document.getElementById('prod-tbody');
   if(isInventoryTableCleared())return;
+  if(isDemoProductRecord(product))return;
   if(!tbody||!product?.name||hasFirstCellValue(tbody,product.code))return;
   const vatText=String(product.vat||'').includes('0')&&!String(product.vat||'').includes('5')?'0% Zero':String(product.vat||'').includes('Exempt')?'Exempt':'5%';
   const vatClass=vatText==='5%'?'b-b':'b-t';
@@ -2749,6 +2885,7 @@ async function loadStockLevelsFromServer(){
         unit:row.unit||'PCS',
         reorderLevel:parseAmount(row.reorder_level??row.reorderLevel)
       }))
+      .filter(item=>!isDemoProductRecord(item))
       .filter(item=>item.code||item.name);
     if(!products.length){
       setInventoryTableCleared(true);
@@ -2771,7 +2908,12 @@ async function loadStockLevelsFromServer(){
 async function clearInventoryTable(){
   const tbody=document.getElementById('stock-level-tbody');
   if(!tbody)return;
-  if(!window.confirm('Clear the inventory table? This removes Item Master products, stock mappings, stock movements, and valuation layers. Purchase records remain unchanged.'))return;
+  const confirmed=await appConfirm({
+    title:'Clear Inventory Table',
+    message:'Clear the inventory table? This removes Item Master products, stock mappings, stock movements, and valuation layers. Purchase records remain unchanged.',
+    okText:'Clear Table'
+  });
+  if(!confirmed)return;
   stockLevelsServerRefreshPaused=true;
   try{
     await moduleApi('/inventory/stock-levels',{method:'DELETE'});
@@ -3719,11 +3861,38 @@ function addFourPurchaseRecords(){
   toast('4 purchase records added','ok');
 }
 
+function accountTypeLabel(value){
+  const normalized=String(value||'Asset').trim().toLowerCase();
+  return {
+    purchase:'Purchase',
+    sales:'Sales',
+    'direct expense':'Direct expense',
+    'indirect expense':'Indirect expense',
+    'direct income':'Direct income',
+    'indirect income':'Indirect income',
+    asset:'Asset',
+    liability:'Liability',
+    equity:'Equity',
+    revenue:'Direct income',
+    expense:'Indirect expense'
+  }[normalized]||titleCase(normalized);
+}
+
+function accountTypeBadgeClass(value){
+  const normalized=String(value||'').trim().toLowerCase();
+  if(['sales','direct income','indirect income','revenue'].includes(normalized))return 'b-g';
+  if(['purchase','direct expense','indirect expense','expense'].includes(normalized))return 'b-p';
+  if(normalized==='asset')return 'b-t';
+  if(normalized==='liability')return 'b-r';
+  if(normalized==='equity')return 'b-b';
+  return 'b-gray';
+}
+
 function renderAccountRecord(account){
   const tbody=document.getElementById('account-tbody');
   if(!tbody||!account?.code||hasFirstCellValue(tbody,account.code))return;
-  const type=titleCase(account.type||'Asset');
-  const typeClass={Asset:'b-t',Liability:'b-r',Revenue:'b-g',Expense:'b-p',Equity:'b-b'}[type]||'b-gray';
+  const type=accountTypeLabel(account.type||'Asset');
+  const typeClass=accountTypeBadgeClass(account.type||type);
   const row=document.createElement('tr');
   row.dataset.serverRecord='accounts';
   row.dataset.accountId=account.id||'';
@@ -3747,7 +3916,7 @@ function accountRecordFromRow(row){
   };
 }
 
-function deleteAccountRow(btn){
+async function deleteAccountRow(btn){
   const row=btn.closest('tr');
   const table=row?.closest('table');
   if(!row||!table)return;
@@ -3759,7 +3928,12 @@ function deleteAccountRow(btn){
     audit('Delete blocked',label,reason);
     return;
   }
-  if(!window.confirm(`Delete account ${label}?`))return;
+  const confirmed=await appConfirm({
+    title:'Delete Account',
+    message:`Delete account ${label}?`,
+    okText:'Delete'
+  });
+  if(!confirmed)return;
   row.remove();
   if(record.id||row.dataset.accountId){
     moduleApi(`/accounts/${encodeURIComponent(record.id||row.dataset.accountId)}`,{method:'DELETE'})
@@ -3808,16 +3982,66 @@ function titleCase(value){
   return String(value||'').toLowerCase().replace(/\b\w/g,ch=>ch.toUpperCase());
 }
 
+const DEMO_PRODUCT_CODES=new Set([
+  'PRD-001','STL-12MM','PKG-BOX-A','OIL-5L','GLV-SAFE','LOG-LOCAL','OFF-CHAIR','PPE-HELMET','ELE-CABLE','PKG-BOX','PRN-FLYER','FUEL-DIESEL','IT-MON24','UNI-STAFF','WTR-CASE','MNT-HOUR','COU-DOC','TLS-DRILL','WH-SPACE','PPE-VEST','JAN-CLEAN','IT-LAP15','ELE-LED','TLS-HAM'
+]);
+const DEMO_PRODUCT_NAMES=new Set([
+  'steel rods 12mm','packaging box a','industrial oil 5l','safety gloves','corrugated box a','safety helmet','copper cable roll','ergonomic office chair','business laptop 15 inch','diesel supply','document courier','maintenance technician hour','high visibility vest','local delivery service','corrugated packing box','printed flyer pack','24 inch led monitor','staff uniform set','drinking water case','cordless drill machine','warehouse space rental','deep cleaning service','led panel light','industrial hammer'
+]);
+
+function productCodeValue(product={}){
+  return String(product.code||product.sku||product.id||'').trim();
+}
+
+function productNameValue(product={}){
+  return String(product.name||product.product_name||product.description||'').trim();
+}
+
+function isDemoProductRecord(product={}){
+  const code=productCodeValue(product).toUpperCase();
+  const baseCode=code.replace(/-\d{2}$/,'');
+  const name=productNameValue(product).toLowerCase().replace(/\s+\d{2}$/,'');
+  return /^RT10-|^REAL15|^REAL50|^BULK50/.test(code)||DEMO_PRODUCT_CODES.has(code)||DEMO_PRODUCT_CODES.has(baseCode)||DEMO_PRODUCT_NAMES.has(name);
+}
+
+function removeDemoProductRows(){
+  let removed=0;
+  document.querySelectorAll('#prod-tbody tr:not([data-empty-state])').forEach(row=>{
+    if(isDemoProductRecord({code:inventoryRowCellText(row,0),name:inventoryRowCellText(row,1)})){
+      row.remove();
+      removed++;
+    }
+  });
+  const tbody=document.getElementById('prod-tbody');
+  if(tbody&&tbody.querySelectorAll('tr:not([data-empty-state])').length===0)emptyTableMessage(tbody,'No products in database yet.');
+  return removed;
+}
+
+function cleanupDemoProductsFromServer(products=[]){
+  const demoProducts=(products||[]).filter(isDemoProductRecord);
+  if(!demoProducts.length)return;
+  Promise.allSettled(demoProducts.map(product=>deleteServer('products',{
+    ...product,
+    id:productCodeValue(product),
+    code:productCodeValue(product),
+    name:productNameValue(product)
+  }))).then(results=>{
+    const deleted=results.filter(result=>result.status==='fulfilled').length;
+    if(deleted)console.info(`Removed ${deleted} demo Item Master product(s) from database`);
+  });
+}
+
 function hydrateFromServer(){
   return apiRequest('bootstrap',{}, {method:'GET'}).then(({data})=>{
     if(!data)return;
     isHydratingFromServer=true;
     const renderStats={};
+    const productRows=Array.isArray(data.products)?data.products.filter(product=>!isDemoProductRecord(product)):[];
     try{
       financePaymentsByRef.clear();
       financeBankAccountsByKey.clear();
       if(data.company)applyCompanyToUi(data.company);
-      renderStats.products=renderRecordList(data.products,product=>renderProductRecord(product,{deferRefresh:true,deferStockSync:true,deferMappingSync:true,deferSuggestions:true}),'product');
+      renderStats.products=renderRecordList(productRows,product=>renderProductRecord(product,{deferRefresh:true,deferStockSync:true,deferMappingSync:true,deferSuggestions:true}),'product');
       renderStats.salesCategories=renderRecordList(data.salesCategories,renderSalesCategoryRecord,'sales category');
       renderStats.salesUnits=renderRecordList(data.salesUnits,renderSalesUnitRecord,'sales unit');
       renderStats.customers=renderRecordList(data.customers,renderCustomerRecord,'customer');
@@ -3837,6 +4061,8 @@ function hydrateFromServer(){
       renderStats.rotaShifts=renderRecordList(data.rotaShifts,renderRotaShiftRecord,'rota shift');
       renderStats.rotaSwaps=renderRecordList(data.rotaSwaps,renderRotaSwapRecord,'rota swap');
       renderStats.rotaApprovals=renderRecordList(data.rotaApprovals,renderRotaApprovalRecord,'rota approval');
+      renderStats.rotaAssignments=renderRecordList(data.rotaAssignments,renderRotaAssignmentRecord,'rota assignment');
+      renderRotaBoards();
       renderStats.expenses=renderRecordList(data.expenses,renderExpenseRecord,'expense');
       renderStats.purchaseRecords={rendered:0,failed:0,total:0,lazy:true};
       loadPurchaseDocumentsFromServer(data.purchaseDocuments||[],[]);
@@ -3844,7 +4070,7 @@ function hydrateFromServer(){
       isHydratingFromServer=false;
     }
     const totalLoaded=[
-      data.products,
+      productRows,
       data.customers,
       data.salesInvoices,
       data.quotations,
@@ -3854,6 +4080,7 @@ function hydrateFromServer(){
       data.rotaShifts,
       data.rotaSwaps,
       data.rotaApprovals,
+      data.rotaAssignments,
       []
     ].reduce((sum,rows)=>sum+(Array.isArray(rows)?rows.length:0),0);
     window.__taxflowLastDbLoad={at:new Date().toISOString(),totalLoaded,renderStats};
@@ -3884,6 +4111,8 @@ function hydrateFromServer(){
     refreshInvoiceProductSuggestions();
     refreshPurchaseProductSuggestions();
     refreshQuotationProductOptions();
+    removeDemoProductRows();
+    cleanupDemoProductsFromServer(data.products);
     loadStockMappingsFromServer();
     loadAccountingFromDb();
     loadCorporateAccountingFromDb(data);
@@ -4482,7 +4711,7 @@ function defaultInvoiceLayout(){
     color:'#2563eb',
     logo:'TaxFlow',
     font:'Modern Sans',
-    company:currentCompany?.name||'TaxFlow UAE LLC',
+    company:currentCompany?.name||'',
     trnMode:'show',
     taxLabel:'Tax Invoice',
     address:'Dubai, United Arab Emirates',
@@ -5795,7 +6024,7 @@ function openAddCustomerFromInvoice(){
   showM('m-customer');
 }
 
-function deletePurchaseRecord(btn){
+async function deletePurchaseRecord(btn){
   const row=btn.closest('tr');
   const table=row?.closest('table');
   if(!row||!table)return;
@@ -5808,7 +6037,12 @@ function deletePurchaseRecord(btn){
     audit('Delete blocked',ref,'Paid purchase');
     return;
   }
-  if(!window.confirm(`Delete purchase record ${ref}? This also removes its source transaction and stock movement from the database.`))return;
+  const confirmed=await appConfirm({
+    title:'Delete Purchase Record',
+    message:`Delete purchase record ${ref}? This also removes its source transaction and stock movement from the database.`,
+    okText:'Delete'
+  });
+  if(!confirmed)return;
   row.remove();
   purchaseRecordCache.delete(String(ref));
   purchaseRecordsTotal=Math.max(0,purchaseRecordsTotal-1);
@@ -6901,10 +7135,10 @@ function countPurchaseAiInvoiceNo(invoiceNo){
 
 function purchaseAiUploadActionsHtml(){
   return `<div class="row-actions">
-    <button class="ai-card-action view" type="button" title="View" aria-label="View purchase AI invoice" onclick="openPurchaseAiView(this)">${viewIconSvg()}<span>View</span></button>
-    <button class="ai-card-action edit" type="button" title="Edit" aria-label="Edit purchase AI row" onclick="openPurchaseAiEdit(this)">${editIconSvg()}<span>Edit</span></button>
+    <button class="ai-card-action view" type="button" title="View" aria-label="View purchase AI invoice" onclick="openPurchaseAiView(this)">${viewIconSvg()}</button>
+    <button class="ai-card-action edit" type="button" title="Edit" aria-label="Edit purchase AI row" onclick="openPurchaseAiEdit(this)">${editIconSvg()}</button>
     <button class="ai-card-action approve" type="button" title="Approve" aria-label="Approve purchase AI row" onclick="approvePurchaseAiRow(this)">${checkIconSvg()}<span>Approve</span></button>
-    <button class="ai-card-action delete" type="button" title="Delete" aria-label="Delete purchase AI row" onclick="deletePurchaseAiRow(this)">${deleteIconSvg()}<span>Delete</span></button>
+    <button class="ai-card-action delete" type="button" title="Delete" aria-label="Delete purchase AI row" onclick="deletePurchaseAiRow(this)">${deleteIconSvg()}</button>
   </div>`;
 }
 
@@ -9115,6 +9349,9 @@ function shiftHours(start,end,breakMinutes=0){
 }
 
 let activeRotaCell=null;
+const rotaAssignmentsById=new Map();
+const ROTA_WEEK_DAYS=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+const ROTA_DEFAULT_STAFF=[];
 
 const ROTA_EDIT_DEFAULTS={
   Morning:{code:'M',start:'09:00',end:'18:00',mark:'Shift',className:'approved',icon:'✓'},
@@ -9130,13 +9367,86 @@ function rotaCellTypeFromCode(code){
   return {M:'Morning',E:'Evening',N:'Night',OFF:'Off',L:'Leave',OT:'Overtime'}[value]||'Morning';
 }
 
+function weekStartValue(){
+  return document.getElementById('rota-week-start')?.value||document.getElementById('rota-dept-week-start')?.value||new Date().toISOString().slice(0,10);
+}
+
+function weekDateFromStart(start,offset){
+  const date=new Date(`${start}T00:00:00`);
+  if(Number.isNaN(date.getTime()))return start;
+  date.setDate(date.getDate()+offset);
+  return date.toISOString().slice(0,10);
+}
+
+function currentRotaStaff(){
+  const rows=[...document.querySelectorAll('#employee-tbody tr:not([data-empty-state])')].map(row=>({
+    id:(row.children[0]?.textContent||'').trim(),
+    name:(row.children[1]?.textContent||'').trim(),
+    department:(row.children[2]?.textContent||'').trim()||'Management',
+    role:(row.children[3]?.textContent||'').trim()||'Employee',
+    location:(row.children[7]?.textContent||'').trim()||'Dubai HQ'
+  })).filter(staff=>staff.id&&staff.name);
+  return rows.length?rows.slice(0,24):ROTA_DEFAULT_STAFF;
+}
+
+function rotaAssignmentId(employeeId,date){
+  return `${employeeId}-${date}`;
+}
+
+function normalizeRotaAssignment(record={}){
+  const date=record.date||record.rota_date||weekStartValue();
+  const employeeId=record.employee_id||record.employeeId||record.staff_id||`ROTA-EMP-${Date.now()}`;
+  const type=record.type||rotaCellTypeFromCode(record.code||record.shift_code||'M');
+  const defaults=ROTA_EDIT_DEFAULTS[type]||ROTA_EDIT_DEFAULTS.Morning;
+  return {
+    id:record.id||rotaAssignmentId(employeeId,date),
+    employee_id:employeeId,
+    employee_name:record.employee_name||record.employee||record.name||'Employee',
+    role:record.role||record.designation||'Employee',
+    department:record.department||'Management',
+    location:record.location||'Dubai HQ',
+    date,
+    day:record.day||'',
+    type,
+    code:record.code||defaults.code,
+    start:record.start||record.start_time||defaults.start,
+    end:record.end||record.end_time||defaults.end,
+    mark:record.mark||defaults.mark,
+    className:record.className||record.class_name||defaults.className,
+    notes:record.notes||'',
+    status:record.status||'Draft',
+    updated_at:record.updated_at||new Date().toISOString()
+  };
+}
+
+function renderRotaAssignmentRecord(record){
+  const assignment=normalizeRotaAssignment(record);
+  rotaAssignmentsById.set(assignment.id,assignment);
+  renderRotaBoards();
+}
+
+function rotaCellHtml(assignment){
+  const defaults=ROTA_EDIT_DEFAULTS[assignment?.type||'Off']||ROTA_EDIT_DEFAULTS.Off;
+  const code=assignment?.code||defaults.code;
+  const start=assignment?.start||defaults.start;
+  const end=assignment?.end||defaults.end;
+  const time=start&&end?`${start}-${end}`:'-';
+  const className=assignment?.className||defaults.className;
+  const icon=assignment?.status==='Published'?'OK':(className==='off'?'-':className==='draft'?'o':className==='overtime'?'!':'OK');
+  return `<div class="rota-cell ${escapeHtml(className)}"><strong>${escapeHtml(code)}</strong><span>${escapeHtml(time)}</span><em>${escapeHtml(icon)}</em></div>`;
+}
+
+function rotaHours(assignment){
+  if(!assignment||['OFF','L'].includes(String(assignment.code||'').toUpperCase()))return 0;
+  const hours=parseFloat(shiftHours(assignment.start,assignment.end,0));
+  return Number.isFinite(hours)?hours:0;
+}
+
 function openRotaCellEditor(cell){
   activeRotaCell=cell;
-  const row=cell.closest('tr');
-  const table=cell.closest('table');
-  const cellIndex=[...row.children].indexOf(cell);
-  const day=table?.querySelector(`thead th:nth-child(${cellIndex+1})`)?.textContent.trim()||'Shift';
-  const employee=row?.children?.[0]?.textContent.trim()||'Employee';
+  const assignment=cell.dataset.assignment?normalizeRotaAssignment(JSON.parse(cell.dataset.assignment)):null;
+  const day=cell.dataset.day||assignment?.day||'Shift';
+  const employee=cell.dataset.employeeName||assignment?.employee_name||'Employee';
   const rota=cell.querySelector('.rota-cell');
   const code=rota?.querySelector('strong')?.textContent.trim()||'M';
   const time=rota?.querySelector('span')?.textContent.trim()||'09:00-18:00';
@@ -9147,8 +9457,8 @@ function openRotaCellEditor(cell){
   setFieldValue(document.getElementById('rota-edit-start'),start&&start!=='-'?start:'');
   setFieldValue(document.getElementById('rota-edit-end'),end&&end!=='-'?end:'');
   setFieldValue(document.getElementById('rota-edit-break'),'60');
-  setSelectValue(document.getElementById('rota-edit-mark'),ROTA_EDIT_DEFAULTS[type]?.mark||'Shift');
-  setFieldValue(document.getElementById('rota-edit-notes'),'');
+  setSelectValue(document.getElementById('rota-edit-mark'),assignment?.mark||ROTA_EDIT_DEFAULTS[type]?.mark||'Shift');
+  setFieldValue(document.getElementById('rota-edit-notes'),assignment?.notes||'');
   showM('m-edit-shift');
 }
 
@@ -9160,7 +9470,7 @@ function applyRotaEditTypeDefaults(){
   setSelectValue(document.getElementById('rota-edit-mark'),defaults.mark);
 }
 
-function saveRotaCellShift(){
+function legacySaveRotaCellShift(){
   if(!activeRotaCell){
     toast('Select a rota cell first','warn');
     return;
@@ -9182,7 +9492,7 @@ function saveRotaCellShift(){
   audit('Updated rota cell',`${code} ${time}`,'Saved');
 }
 
-function removeRotaCellShift(){
+function legacyRemoveRotaCellShift(){
   if(!activeRotaCell){
     closeM('m-edit-shift');
     return;
@@ -9194,12 +9504,203 @@ function removeRotaCellShift(){
   audit('Removed rota cell','Weekly rota','Deleted');
 }
 
-const DEFAULT_ROTA_SHIFTS=[
-  {id:'MOR',name:'Morning Shift',code:'MOR',start:'09:00',end:'18:00',break_minutes:60,grace:'10 minutes',ot_after:'8 hours',status:'Active'},
-  {id:'EVE',name:'Evening Shift',code:'EVE',start:'14:00',end:'22:00',break_minutes:30,grace:'10 minutes',ot_after:'8 hours',status:'Active'},
-  {id:'NIG',name:'Night Shift',code:'NIG',start:'21:00',end:'06:00',break_minutes:60,grace:'15 minutes',ot_after:'8 hours',status:'Active'},
-  {id:'OFF',name:'Off Day',code:'OFF',start:'',end:'',break_minutes:0,grace:'-',ot_after:'-',status:'Active'}
-];
+function saveActiveRotaAssignmentFromModal(forceOff=false){
+  if(!activeRotaCell){
+    toast('Select a rota cell first','warn');
+    return null;
+  }
+  const type=forceOff?'Off':document.getElementById('rota-edit-type')?.value||'Morning';
+  const defaults=ROTA_EDIT_DEFAULTS[type]||ROTA_EDIT_DEFAULTS.Morning;
+  const mark=forceOff?'Off':document.getElementById('rota-edit-mark')?.value||defaults.mark;
+  const start=forceOff?'':document.getElementById('rota-edit-start')?.value||defaults.start;
+  const end=forceOff?'':document.getElementById('rota-edit-end')?.value||defaults.end;
+  const className=mark==='Off'?'off':mark==='Leave'?'draft':mark==='OT'?'overtime':defaults.className;
+  const code=mark==='Off'?'OFF':mark==='Leave'?'L':mark==='OT'?'OT':defaults.code;
+  const existing=activeRotaCell.dataset.assignment?normalizeRotaAssignment(JSON.parse(activeRotaCell.dataset.assignment)):{};
+  const assignment=normalizeRotaAssignment({
+    ...existing,
+    employee_id:activeRotaCell.dataset.employeeId,
+    employee_name:activeRotaCell.dataset.employeeName,
+    role:activeRotaCell.dataset.role,
+    department:activeRotaCell.dataset.department,
+    location:activeRotaCell.dataset.location,
+    date:activeRotaCell.dataset.date,
+    day:activeRotaCell.dataset.day,
+    type,
+    code,
+    start,
+    end,
+    mark,
+    className,
+    notes:forceOff?'':document.getElementById('rota-edit-notes')?.value||'',
+    status:document.getElementById('rota-weekly-status')?.textContent?.trim()||'Draft',
+    updated_at:new Date().toISOString()
+  });
+  activeRotaCell.dataset.assignment=JSON.stringify(assignment);
+  activeRotaCell.innerHTML=rotaCellHtml(assignment);
+  rotaAssignmentsById.set(assignment.id,assignment);
+  saveServer('rotaAssignments',assignment);
+  renderRotaBoards();
+  return assignment;
+}
+
+function saveRotaCellShift(){
+  const assignment=saveActiveRotaAssignmentFromModal(false);
+  closeM('m-edit-shift');
+  if(!assignment)return;
+  toast('Shift saved to database','ok');
+  audit('Updated rota cell',`${assignment.employee_name} ${assignment.date}`,'Saved');
+}
+
+function removeRotaCellShift(){
+  const assignment=saveActiveRotaAssignmentFromModal(true);
+  closeM('m-edit-shift');
+  if(!assignment)return;
+  toast('Shift removed','warn');
+  audit('Removed rota cell',`${assignment.employee_name} ${assignment.date}`,'Deleted');
+}
+
+function syncRotaWeekFromDept(){
+  const deptWeek=document.getElementById('rota-dept-week-start')?.value;
+  if(deptWeek)setFieldValue(document.getElementById('rota-week-start'),deptWeek);
+  renderRotaBoards();
+}
+
+function filteredRotaStaff(scope='week'){
+  const department=document.getElementById(scope==='month'?'rota-month-department':scope==='dept'?'rota-dept-department':'rota-week-department')?.value||'All Departments';
+  const search=(document.getElementById(scope==='month'?'rota-month-search':'rota-staff-search')?.value||'').toLowerCase();
+  return currentRotaStaff().filter(staff=>{
+    const deptOk=department==='All Departments'||staff.department===department;
+    const searchOk=!search||staff.name.toLowerCase().includes(search)||staff.role.toLowerCase().includes(search);
+    return deptOk&&searchOk;
+  });
+}
+
+function assignmentFor(staff,date,day){
+  const existing=rotaAssignmentsById.get(rotaAssignmentId(staff.id,date));
+  if(existing)return existing;
+  return normalizeRotaAssignment({
+    id:rotaAssignmentId(staff.id,date),
+    employee_id:staff.id,
+    employee_name:staff.name,
+    role:staff.role,
+    department:staff.department,
+    location:staff.location,
+    date,
+    day,
+    type:'Off',
+    code:'OFF',
+    start:'',
+    end:'',
+    mark:'Off',
+    className:'off'
+  });
+}
+
+function renderWeeklyRotaBoard(){
+  const board=document.getElementById('rota-weekly-board');
+  if(!board)return;
+  const start=weekStartValue();
+  const staffRows=filteredRotaStaff('week');
+  if(!staffRows.length){
+    board.innerHTML='<div class="empty-card">No staff found for this filter.</div>';
+    return;
+  }
+  board.innerHTML=staffRows.map(staff=>{
+    const cells=ROTA_WEEK_DAYS.map((day,index)=>{
+      const date=weekDateFromStart(start,index);
+      const assignment=assignmentFor(staff,date,day);
+      return `<button class="rota-day-cell" type="button" onclick="openRotaCellEditor(this)" data-assignment="${escapeHtml(JSON.stringify(assignment))}" data-employee-id="${escapeHtml(staff.id)}" data-employee-name="${escapeHtml(staff.name)}" data-role="${escapeHtml(staff.role)}" data-department="${escapeHtml(staff.department)}" data-location="${escapeHtml(staff.location)}" data-date="${escapeHtml(date)}" data-day="${escapeHtml(day)}"><small>${escapeHtml(day)} ${escapeHtml(date.slice(8))}</small>${rotaCellHtml(assignment)}</button>`;
+    }).join('');
+    const total=ROTA_WEEK_DAYS.reduce((sum,day,index)=>sum+rotaHours(assignmentFor(staff,weekDateFromStart(start,index),day)),0);
+    return `<div class="rota-staff-row"><div class="rota-staff-meta"><strong>${escapeHtml(staff.name)}</strong><span>${escapeHtml(staff.role)} · ${escapeHtml(staff.department)}</span><em>${total.toFixed(1)} hrs</em></div><div class="rota-day-grid">${cells}</div></div>`;
+  }).join('');
+}
+
+function selectedWeekAssignments(scope='week'){
+  const start=scope==='dept'?(document.getElementById('rota-dept-week-start')?.value||weekStartValue()):weekStartValue();
+  const staffRows=filteredRotaStaff(scope);
+  const ids=new Set(staffRows.map(staff=>staff.id));
+  const dates=new Set(ROTA_WEEK_DAYS.map((day,index)=>weekDateFromStart(start,index)));
+  return [...rotaAssignmentsById.values()].filter(item=>ids.has(item.employee_id)&&dates.has(item.date));
+}
+
+function renderRotaSummary(){
+  const weeklyBody=document.getElementById('rota-weekly-summary-tbody');
+  const monthBody=document.getElementById('rota-monthly-summary-tbody');
+  const weekly=selectedWeekAssignments('week');
+  const staffCount=new Set(weekly.map(item=>item.employee_id)).size||filteredRotaStaff('week').length;
+  const scheduled=weekly.reduce((sum,item)=>sum+rotaHours(item),0);
+  const ot=weekly.filter(item=>item.code==='OT').length;
+  const leave=weekly.filter(item=>item.code==='L').length;
+  const off=weekly.filter(item=>item.code==='OFF').length;
+  if(weeklyBody)weeklyBody.innerHTML=`<tr><td>Total Staff</td><td class="mono">${staffCount}</td></tr><tr><td>Scheduled Hours</td><td class="mono">${scheduled.toFixed(1)}</td></tr><tr><td>Overtime Cells</td><td class="mono" style="color:var(--purple)">${ot}</td></tr><tr><td>Leave Days</td><td class="mono" style="color:var(--amber)">${leave}</td></tr><tr><td>Off Days</td><td class="mono">${off}</td></tr>`;
+  if(monthBody){
+    const month=(document.getElementById('rota-month-value')?.value||'').slice(0,7);
+    const monthRows=[...rotaAssignmentsById.values()].filter(item=>item.date?.startsWith(month));
+    monthBody.innerHTML=`<tr><td>Total Staff</td><td class="mono">${new Set(monthRows.map(item=>item.employee_id)).size}</td></tr><tr><td>Scheduled Hours</td><td class="mono">${monthRows.reduce((sum,item)=>sum+rotaHours(item),0).toFixed(1)}</td></tr><tr><td>Leave Days</td><td class="mono" style="color:var(--amber)">${monthRows.filter(item=>item.code==='L').length}</td></tr><tr><td>Off Days</td><td class="mono">${monthRows.filter(item=>item.code==='OFF').length}</td></tr>`;
+  }
+}
+
+function renderMonthlyRotaBoard(){
+  const board=document.getElementById('rota-monthly-board');
+  if(!board)return;
+  const month=document.getElementById('rota-month-value')?.value||weekStartValue().slice(0,7);
+  const staffRows=filteredRotaStaff('month');
+  board.innerHTML=staffRows.map(staff=>{
+    const items=[...rotaAssignmentsById.values()].filter(item=>item.employee_id===staff.id&&item.date?.startsWith(month)).sort((a,b)=>a.date.localeCompare(b.date));
+    const chips=items.length?items.map(item=>`<span class="rota-month-chip">${escapeHtml(item.date.slice(8))} ${escapeHtml(item.code)}</span>`).join(''):'<span class="card-sub">No saved assignments this month</span>';
+    return `<div class="rota-month-card"><div><strong>${escapeHtml(staff.name)}</strong><span>${escapeHtml(staff.department)} · ${escapeHtml(staff.role)}</span></div><div class="rota-month-days">${chips}</div></div>`;
+  }).join('')||'<div class="empty-card">No staff found for this month.</div>';
+}
+
+function renderDepartmentRota(){
+  const coverage=document.getElementById('rota-dept-coverage');
+  const staffBody=document.getElementById('rota-dept-staff-tbody');
+  const department=document.getElementById('rota-dept-department')?.value||'All Departments';
+  setText('rota-dept-sub',department);
+  const assignments=selectedWeekAssignments('dept');
+  const counts={M:0,E:0,N:0,OT:0};
+  assignments.forEach(item=>{if(counts[item.code]!==undefined)counts[item.code]+=1;});
+  if(coverage){
+    coverage.innerHTML=[['Morning','M',5],['Evening','E',3],['Night','N',2],['Overtime','OT',1]].map(([label,code,required])=>{
+      const assigned=counts[code]||0;
+      const pct=Math.min(100,Math.round((assigned/required)*100));
+      const cls=assigned>=required?'b-g':assigned?'b-a':'b-r';
+      return `<div class="rota-coverage-card"><strong>${label}</strong><span>${assigned}/${required}</span><div class="prog-bar"><div class="prog-fill" style="width:${pct}%;background:${assigned>=required?'var(--green)':assigned?'var(--amber)':'var(--red)'}"></div></div>${rotaBadge(assigned>=required?'Covered':assigned?'Shortage':'Missing')}</div>`;
+    }).join('');
+  }
+  if(staffBody){
+    const staffRows=filteredRotaStaff('dept');
+    staffBody.innerHTML=staffRows.map(staff=>{
+      const hours=assignments.filter(item=>item.employee_id===staff.id).reduce((sum,item)=>sum+rotaHours(item),0);
+      return `<tr><td>${escapeHtml(staff.name)}</td><td>${escapeHtml(staff.department)}</td><td class="mono">${hours.toFixed(1)}</td><td>${rotaBadge(hours?'Scheduled':'Open')}</td></tr>`;
+    }).join('')||'<tr data-empty-state="1"><td colspan="4" style="color:var(--text3);text-align:center">No staff found.</td></tr>';
+  }
+  const short=Object.values(counts).every(Boolean);
+  const status=document.getElementById('rota-dept-status');
+  if(status){
+    status.className=`b ${short?'b-g':'b-a'}`;
+    status.textContent=short?'Coverage Ready':'Needs Coverage Review';
+  }
+}
+
+function renderRotaCodes(){
+  const row=document.getElementById('rota-code-row');
+  if(!row)return;
+  row.innerHTML=['M Morning','E Evening','N Night','OFF Off','L Leave','OT Overtime'].map(text=>`<span class="chip">${escapeHtml(text)}</span>`).join('');
+}
+
+function renderRotaBoards(){
+  renderWeeklyRotaBoard();
+  renderMonthlyRotaBoard();
+  renderDepartmentRota();
+  renderRotaSummary();
+  renderRotaCodes();
+  updateRotaStats();
+}
+
+const DEFAULT_ROTA_SHIFTS=[];
 
 function seedDefaultRotaShifts(){
   const tbody=document.getElementById('rota-shift-tbody');
@@ -9331,12 +9832,15 @@ function renderRotaApprovalRecord(approval){
 }
 
 function saveRotaDraft(status='Draft'){
+  setText('rota-weekly-status',status);
+  setText('rota-monthly-status',status);
   const record={
     id:'ROTA-'+Date.now(),
-    department:'All Departments',
-    period:new Date().toISOString().slice(0,10),
-    supervisor:'HR',
-    status
+    department:document.getElementById('rota-week-department')?.value||'All Departments',
+    period:weekStartValue(),
+    supervisor:document.getElementById('rota-dept-supervisor')?.value||'HR',
+    status,
+    assignment_count:rotaAssignmentsById.size
   };
   saveServer('rotaDrafts',record);
   const approval={...record,id:'APP-'+Date.now(),status:status==='Draft'?'Draft':'Pending Supervisor Review'};
@@ -9360,17 +9864,70 @@ function updateRotaStats(){
 }
 
 function publishRota(){
+  [...rotaAssignmentsById.values()].forEach(item=>{
+    item.status='Published';
+    saveServer('rotaAssignments',item);
+  });
   saveRotaDraft('Published');
+  renderRotaBoards();
   toast('Rota published. Employees notified and attendance timing updated','ok');
   audit('Rota published','Rota Planning','Published');
 }
 
 function copyPreviousRota(){
+  const start=weekStartValue();
+  const priorStart=weekDateFromStart(start,-7);
+  const staffRows=filteredRotaStaff('week');
+  let copied=0;
+  staffRows.forEach(staff=>{
+    ROTA_WEEK_DAYS.forEach((day,index)=>{
+      const priorDate=weekDateFromStart(priorStart,index);
+      const currentDate=weekDateFromStart(start,index);
+      const prior=rotaAssignmentsById.get(rotaAssignmentId(staff.id,priorDate));
+      if(prior){
+        const next=normalizeRotaAssignment({...prior,id:rotaAssignmentId(staff.id,currentDate),date:currentDate,day,status:'Draft',updated_at:new Date().toISOString()});
+        rotaAssignmentsById.set(next.id,next);
+        saveServer('rotaAssignments',next);
+        copied++;
+      }
+    });
+  });
+  renderRotaBoards();
   toast('Previous week copied. Leave, inactive employee, and hour-limit checks completed.','ok');
   audit('Previous rota copied','Rota Planning','Draft');
 }
 
 function autoGenerateRota(){
+  const start=weekStartValue();
+  const staffRows=filteredRotaStaff('week').slice(0,4);
+  staffRows.forEach((staff,staffIndex)=>{
+    ROTA_WEEK_DAYS.forEach((day,index)=>{
+      const isOff=index===((staffIndex+2)%7)||index===6;
+      const type=isOff?'Off':(['Morning','Evening','Night'][staffIndex%3]);
+      const defaults=ROTA_EDIT_DEFAULTS[type]||ROTA_EDIT_DEFAULTS.Off;
+      const date=weekDateFromStart(start,index);
+      const assignment=normalizeRotaAssignment({
+        id:rotaAssignmentId(staff.id,date),
+        employee_id:staff.id,
+        employee_name:staff.name,
+        role:staff.role,
+        department:staff.department,
+        location:staff.location,
+        date,
+        day,
+        type,
+        code:defaults.code,
+        start:defaults.start,
+        end:defaults.end,
+        mark:defaults.mark,
+        className:defaults.className,
+        status:'Draft'
+      });
+      rotaAssignmentsById.set(assignment.id,assignment);
+      saveServer('rotaAssignments',assignment);
+    });
+  });
+  renderRotaBoards();
   toast('Rota auto-generated from availability, leave, coverage, and rest-day rules.','ok');
   audit('Rota auto-generated','Rota Planning','Draft');
 }
@@ -9381,6 +9938,39 @@ function copyPreviousMonthRota(){
 }
 
 function autoGenerateMonthlyRota(){
+  const month=document.getElementById('rota-month-value')?.value||weekStartValue().slice(0,7);
+  const start=`${month}-01`;
+  const staffRows=filteredRotaStaff('month').slice(0,4);
+  staffRows.forEach((staff,staffIndex)=>{
+    for(let index=0;index<28;index++){
+      const date=weekDateFromStart(start,index);
+      if(!date.startsWith(month))continue;
+      const day=ROTA_WEEK_DAYS[index%7];
+      const isOff=index%7===6||index%7===((staffIndex+2)%7);
+      const type=isOff?'Off':(['Morning','Evening','Night'][staffIndex%3]);
+      const defaults=ROTA_EDIT_DEFAULTS[type]||ROTA_EDIT_DEFAULTS.Off;
+      const assignment=normalizeRotaAssignment({
+        id:rotaAssignmentId(staff.id,date),
+        employee_id:staff.id,
+        employee_name:staff.name,
+        role:staff.role,
+        department:staff.department,
+        location:staff.location,
+        date,
+        day,
+        type,
+        code:defaults.code,
+        start:defaults.start,
+        end:defaults.end,
+        mark:defaults.mark,
+        className:defaults.className,
+        status:'Draft'
+      });
+      rotaAssignmentsById.set(assignment.id,assignment);
+      saveServer('rotaAssignments',assignment);
+    }
+  });
+  renderRotaBoards();
   toast('Monthly rota auto-generated from availability, holidays, coverage, rest gaps, and role skills.','ok');
   audit('Monthly rota auto-generated','Rota Planning','Draft');
 }
@@ -9945,7 +10535,7 @@ function buildSystemAIResponse(question){
     return 'Bills covers vendor bills, purchase orders, and aged payables. Supplier and vendor directory is managed from the Purchase module.';
   }
   if(q.includes('payment')||q.includes('receipt')||q.includes('gateway')||q.includes('settlement')){
-    return 'Payments tracks customer receipts, supplier payments, and gateway settlements. Customer receipts can be allocated to invoices, supplier payments can clear bills, and gateway settlement views show gross, fees, and net amounts.';
+    return 'Bank & Payments tracks bank accounts, customer receipts, supplier payments, transactions, and reconciliation in one module. Customer receipts can be allocated to invoices, supplier payments can clear bills, and bank reconciliation matches statement lines to ledger entries.';
   }
   if(q.includes('tax invoice')||q.includes('invoice include')||q.includes('tax invoice include')){
     return 'UAE tax invoice checklist: supplier legal name and address, supplier TRN, customer name and TRN where applicable, unique invoice number, invoice date, supply date if different, description of goods/services, quantity, unit price, taxable amount, VAT rate, VAT amount in AED, total including VAT, and clear tax treatment such as 5%, 0%, exempt, or reverse charge. TaxFlow supports invoice layout setup in Settings > Documents and TRN/VAT validation in invoice and purchase flows.';
@@ -10604,7 +11194,7 @@ function exportRowDetailPdf(){
   audit('Exported record',title,'PDF');
 }
 
-function deleteCurrentDetailRow(){
+async function deleteCurrentDetailRow(){
   if(!currentDetailRow){
     toast('No row selected to delete','warn');
     return;
@@ -10622,6 +11212,12 @@ function deleteCurrentDetailRow(){
     audit('Delete blocked',label,reason);
     return;
   }
+  const confirmed=await appConfirm({
+    title:'Delete Record',
+    message:`Delete ${label}?`,
+    okText:'Delete'
+  });
+  if(!confirmed)return;
   const collection=inferCollectionFromContext(currentDetailTable);
   const record=currentDetailTable?recordFromTableRow(currentDetailTable,currentDetailRow):{id:label,name:label};
   currentDetailRow.remove();
@@ -11361,6 +11957,37 @@ function separateCorporateAccountingModule(){
   target.dataset.ready='1';
 }
 
+function mergeBankAndPaymentsModule(){
+  const bankPage=document.getElementById('page-bank');
+  const bankTabs=bankPage?.querySelector('.tabs');
+  const paymentsPage=document.getElementById('page-payments');
+  if(!bankPage||!bankTabs||bankPage.dataset.paymentsMerged==='1')return;
+
+  const tabs=[
+    ['pay-in','Receipts'],
+    ['pay-out','Payments']
+  ];
+  tabs.forEach(([target,label])=>{
+    if(!bankTabs.querySelector(`[data-merged-payment-tab="${target}"]`)){
+      const tab=document.createElement('div');
+      tab.className='tab';
+      tab.dataset.mergedPaymentTab=target;
+      tab.setAttribute('onclick',`stab(this,'${target}')`);
+      tab.textContent=label;
+      bankTabs.appendChild(tab);
+    }
+    const body=document.getElementById(target);
+    if(body&&body.parentElement!==bankPage)bankPage.appendChild(body);
+  });
+
+  paymentsPage?.remove();
+  document.querySelectorAll('.nav').forEach(nav=>{
+    const action=nav.getAttribute('onclick')||'';
+    if(action.includes("'payments'"))nav.remove();
+  });
+  bankPage.dataset.paymentsMerged='1';
+}
+
 function initApp(){
   if(window.__taxflowAppInitialized)return;
   window.__taxflowAppInitialized=true;
@@ -11380,6 +12007,7 @@ function initApp(){
       document.querySelectorAll('.overlay.on').forEach(modal=>modal.classList.remove('on'));
     }
   });
+  mergeBankAndPaymentsModule();
   separateCorporateAccountingModule();
   clearStaticDemoData();
   watchVisibleTablePagination();

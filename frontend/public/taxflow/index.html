@@ -62,11 +62,7 @@
     <div class="sb-lbl">Finance</div>
     <div class="nav" onclick="go('bank')">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="6" width="14" height="9" rx="1"/><path d="M1 9h14"/><path d="M8 2L1 6h14L8 2z"/></svg>
-      Bank Accounts
-    </div>
-    <div class="nav" onclick="go('payments')">
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="4" width="12" height="8" rx="1"/><path d="M2 7h12"/><path d="M5 10h3"/></svg>
-      Payments
+      Bank & Payments
     </div>
     <div class="nav" onclick="go('accounting')">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="12" height="12" rx="1"/><path d="M5 5h6M5 8h6M5 11h4"/></svg>
@@ -1097,22 +1093,18 @@
   <div class="tab-body" id="rota-weekly">
     <div class="card mb16">
       <div class="card-hd">
-        <div><div class="card-title">Weekly Rota</div><div class="card-sub">Plan, validate, approve, and publish weekly staff schedules</div></div>
-        <span class="b b-gray">Draft</span>
+        <div><div class="card-title">Weekly Rota</div><div class="card-sub">Assign staff shifts and save the schedule to database</div></div>
+        <span class="b b-gray" id="rota-weekly-status">Draft</span>
       </div>
-      <div class="fr2">
-        <div class="fr2">
-          <div class="fg"><label class="fl">Department</label><select class="fi"><option>Sales</option><option>Warehouse</option><option>Finance</option><option>All Departments</option></select></div>
-          <div class="fg"><label class="fl">Week</label><select class="fi"><option>04 May - 10 May 2026</option><option>11 May - 17 May 2026</option><option>18 May - 24 May 2026</option></select></div>
-        </div>
-        <div class="fr2">
-          <div class="fg"><label class="fl">Location</label><select class="fi"><option>Branch</option><option>Dubai HQ</option><option>Warehouse</option><option>All Locations</option></select></div>
-          <div class="fg"><label class="fl">Status</label><select class="fi"><option>Draft</option><option>Pending Supervisor Review</option><option>Published</option><option>Locked</option></select></div>
-        </div>
+      <div class="fr4">
+        <div class="fg"><label class="fl">Department</label><select class="fi" id="rota-week-department" onchange="renderRotaBoards()"><option>All Departments</option><option>Sales</option><option>Warehouse</option><option>Finance</option><option>Management</option></select></div>
+        <div class="fg"><label class="fl">Week Start</label><input class="fi mono" id="rota-week-start" type="date" value="2026-05-04" onchange="renderRotaBoards()"></div>
+        <div class="fg"><label class="fl">Location</label><select class="fi" id="rota-week-location" onchange="renderRotaBoards()"><option>All Locations</option><option>Branch</option><option>Dubai HQ</option><option>Warehouse</option></select></div>
+        <div class="fg"><label class="fl">Search</label><input class="fi" id="rota-staff-search" placeholder="Employee name" oninput="renderRotaBoards()"></div>
       </div>
       <div class="flx" style="gap:8px;flex-wrap:wrap">
         <button class="btn btn-g btn-sm" onclick="copyPreviousRota()">Copy Previous</button>
-        <button class="btn btn-g btn-sm" onclick="autoGenerateRota()">Auto Generate</button>
+        <button class="btn btn-g btn-sm" onclick="autoGenerateRota()">Auto Fill 4 Staff</button>
         <button class="btn btn-g btn-sm" onclick="saveRotaDraft()">Save Draft</button>
         <button class="btn btn-warn btn-sm" onclick="submitRotaApproval()">Submit Approval</button>
         <button class="btn btn-p btn-sm" onclick="publishRota()">Publish Rota</button>
@@ -1122,144 +1114,36 @@
     <div class="g2 mb16" style="grid-template-columns:2fr 1fr">
       <div class="card">
         <div class="card-hd">
-          <div><div class="card-title">Staff Schedule</div><div class="card-sub">Click any day cell to edit shift, leave, off day, or overtime</div></div>
-          <div class="flx">
-            <input class="fi" style="width:170px" placeholder="Search employee">
-            <select class="fi" style="width:120px"><option>All Roles</option><option>Cashier</option><option>Sales</option><option>Stock</option></select>
-          </div>
+          <div><div class="card-title">Staff Schedule</div><div class="card-sub">Click a cell to edit. Saved cells update weekly, monthly, and department views.</div></div>
+          <button class="btn btn-g btn-sm" onclick="renderRotaBoards()">Refresh</button>
         </div>
-        <table class="tbl">
-          <thead><tr><th>Employee</th><th>Role</th><th>Total Hrs</th><th>Mon 4</th><th>Tue 5</th><th>Wed 6</th><th>Thu 7</th><th>Fri 8</th><th>Sat 9</th><th>Sun 10</th></tr></thead>
-          <tbody id="rota-weekly-schedule-tbody">
-            <tr>
-              <td>Ahmed Rashid</td><td>Cashier</td><td class="mono">40 hrs</td>
-              <td onclick="openRotaCellEditor(this)"><div class="rota-cell approved"><strong>M</strong><span>09:00-18:00</span><em>✓</em></div></td>
-              <td onclick="openRotaCellEditor(this)"><div class="rota-cell approved"><strong>M</strong><span>09:00-18:00</span><em>✓</em></div></td>
-              <td onclick="openRotaCellEditor(this)"><div class="rota-cell off"><strong>OFF</strong><span>-</span><em>•</em></div></td>
-              <td onclick="openRotaCellEditor(this)"><div class="rota-cell draft"><strong>M</strong><span>09:00-18:00</span><em>○</em></div></td>
-              <td onclick="openRotaCellEditor(this)"><div class="rota-cell draft"><strong>M</strong><span>09:00-18:00</span><em>○</em></div></td>
-              <td onclick="openRotaCellEditor(this)"><div class="rota-cell approved"><strong>E</strong><span>14:00-22:00</span><em>✓</em></div></td>
-              <td onclick="openRotaCellEditor(this)"><div class="rota-cell off"><strong>OFF</strong><span>-</span><em>•</em></div></td>
-            </tr>
-            <tr>
-              <td>Sara Al Mansouri</td><td>Sales</td><td class="mono">38 hrs</td>
-              <td onclick="openRotaCellEditor(this)"><div class="rota-cell approved"><strong>E</strong><span>14:00-22:00</span><em>✓</em></div></td>
-              <td onclick="openRotaCellEditor(this)"><div class="rota-cell conflict"><strong>E</strong><span>14:00-22:00</span><em>!</em></div></td>
-              <td onclick="openRotaCellEditor(this)"><div class="rota-cell approved"><strong>M</strong><span>09:00-18:00</span><em>✓</em></div></td>
-              <td onclick="openRotaCellEditor(this)"><div class="rota-cell off"><strong>OFF</strong><span>-</span><em>•</em></div></td>
-              <td onclick="openRotaCellEditor(this)"><div class="rota-cell draft"><strong>M</strong><span>09:00-18:00</span><em>○</em></div></td>
-              <td onclick="openRotaCellEditor(this)"><div class="rota-cell approved"><strong>M</strong><span>09:00-18:00</span><em>✓</em></div></td>
-              <td onclick="openRotaCellEditor(this)"><div class="rota-cell off"><strong>OFF</strong><span>-</span><em>•</em></div></td>
-            </tr>
-            <tr>
-              <td>John Mathew</td><td>Stock</td><td class="mono">45 hrs</td>
-              <td onclick="openRotaCellEditor(this)"><div class="rota-cell night"><strong>N</strong><span>21:00-06:00</span><em>✓</em></div></td>
-              <td onclick="openRotaCellEditor(this)"><div class="rota-cell night"><strong>N</strong><span>21:00-06:00</span><em>✓</em></div></td>
-              <td onclick="openRotaCellEditor(this)"><div class="rota-cell off"><strong>OFF</strong><span>-</span><em>•</em></div></td>
-              <td onclick="openRotaCellEditor(this)"><div class="rota-cell approved"><strong>M</strong><span>09:00-18:00</span><em>✓</em></div></td>
-              <td onclick="openRotaCellEditor(this)"><div class="rota-cell approved"><strong>M</strong><span>09:00-18:00</span><em>✓</em></div></td>
-              <td onclick="openRotaCellEditor(this)"><div class="rota-cell overtime"><strong>OT</strong><span>18:00-20:00</span><em>!</em></div></td>
-              <td onclick="openRotaCellEditor(this)"><div class="rota-cell off"><strong>OFF</strong><span>-</span><em>•</em></div></td>
-            </tr>
-          </tbody>
-        </table>
+        <div class="rota-board" id="rota-weekly-board"></div>
         <div class="divider"></div>
-        <div class="flx" style="gap:8px;flex-wrap:wrap"><button class="btn btn-g btn-sm" onclick="toast('Bulk assign mode enabled','info')">Bulk Assign</button><button class="btn btn-g btn-sm" onclick="toast('Employee notifications queued','ok')">Notify Employees</button></div>
+        <div class="flx" style="gap:8px;flex-wrap:wrap"><button class="btn btn-g btn-sm" onclick="autoGenerateRota()">Bulk Assign</button><button class="btn btn-g btn-sm" onclick="toast('Employee notifications queued','ok')">Notify Employees</button></div>
       </div>
       <div class="card">
         <div class="card-hd"><div class="card-title">Weekly Summary</div></div>
         <table class="tbl">
-          <tbody id="rota-weekly-summary-tbody">
-            <tr><td>Total Employees</td><td class="mono">18</td></tr>
-            <tr><td>Scheduled Hours</td><td class="mono">720</td></tr>
-            <tr><td>Overtime Hours</td><td class="mono" style="color:var(--purple)">24</td></tr>
-            <tr><td>Leave Count</td><td class="mono" style="color:var(--amber)">3</td></tr>
-            <tr><td>Off Days</td><td class="mono">36</td></tr>
-            <tr><td>Conflicts</td><td class="mono" style="color:var(--red)">2</td></tr>
-          </tbody>
+          <tbody id="rota-weekly-summary-tbody"></tbody>
         </table>
         <div class="divider"></div>
-        <div class="toggle-row"><div><div>Auto-generate rules</div><div class="toggle-copy">Availability, leave, previous week, weekly hours, rest days.</div></div><span class="b b-b">Ready</span></div>
-        <div class="toggle-row"><div><div>Approval flow</div><div class="toggle-copy">Draft to supervisor approved to HR published to locked.</div></div><span class="b b-a">Draft</span></div>
-      </div>
-    </div>
-
-    <div class="g2 mb16">
-      <div class="card">
-        <div class="card-hd"><div class="card-title">Department Coverage</div></div>
-        <table class="tbl">
-          <thead><tr><th>Day</th><th>Morning</th><th>Evening</th><th>Night</th><th>Required</th><th>Status</th></tr></thead>
-          <tbody>
-            <tr><td>Mon</td><td>5/5</td><td>3/3</td><td>1/2</td><td class="mono">10</td><td><span class="b b-a">Short</span></td></tr>
-            <tr><td>Tue</td><td>5/5</td><td>3/3</td><td>2/2</td><td class="mono">10</td><td><span class="b b-g">OK</span></td></tr>
-            <tr><td>Wed</td><td>4/5</td><td>3/3</td><td>2/2</td><td class="mono">10</td><td><span class="b b-a">Short</span></td></tr>
-            <tr><td>Thu</td><td>5/5</td><td>3/3</td><td>2/2</td><td class="mono">10</td><td><span class="b b-g">OK</span></td></tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="card">
-        <div class="card-hd"><div class="card-title">Conflict Highlighting</div></div>
-        <table class="tbl">
-          <tbody>
-            <tr><td>Leave conflict</td><td><span class="b b-r">Red</span></td><td>Sara - Tuesday approved leave</td></tr>
-            <tr><td>Double shift</td><td><span class="b b-r">Red</span></td><td>Blocked before publish</td></tr>
-            <tr><td>Missing shift</td><td><span class="b b-a">Yellow</span></td><td>Coverage warning</td></tr>
-            <tr><td>Overtime exceeds limit</td><td><span class="b b-p">Purple</span></td><td>Supervisor approval required</td></tr>
-            <tr><td>Approved</td><td><span class="b b-g">Green</span></td><td>Published or approved rota</td></tr>
-            <tr><td>Draft</td><td><span class="b b-gray">Gray</span></td><td>Not submitted yet</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <div class="g2">
-      <div class="card">
-        <div class="card-hd"><div class="card-title">Rota Codes</div></div>
-        <table class="tbl">
-          <tbody>
-            <tr><td><span class="b b-b">M</span></td><td>Morning</td><td class="mono">09:00-18:00</td></tr>
-            <tr><td><span class="b b-t">E</span></td><td>Evening</td><td class="mono">14:00-22:00</td></tr>
-            <tr><td><span class="b b-p">N</span></td><td>Night</td><td class="mono">21:00-06:00</td></tr>
-            <tr><td><span class="b b-gray">OFF</span></td><td>Off Day</td><td class="mono">-</td></tr>
-            <tr><td><span class="b b-a">L</span></td><td>Leave</td><td class="mono">-</td></tr>
-            <tr><td><span class="b b-p">OT</span></td><td>Overtime</td><td class="mono">Extra hours</td></tr>
-            <tr><td><span class="b b-g">H</span></td><td>Holiday</td><td class="mono">-</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="card">
-        <div class="card-hd"><div class="card-title">Mobile Employee View</div></div>
-        <table class="tbl">
-          <tbody>
-            <tr><td>Mon</td><td>Morning</td><td class="mono">09:00 - 18:00</td></tr>
-            <tr><td>Tue</td><td>Evening</td><td class="mono">14:00 - 22:00</td></tr>
-            <tr><td>Wed</td><td>OFF</td><td class="mono">-</td></tr>
-            <tr><td>Thu</td><td>Morning</td><td class="mono">09:00 - 18:00</td></tr>
-          </tbody>
-        </table>
-        <div class="divider"></div>
-        <div class="flx" style="gap:6px;flex-wrap:wrap"><span class="chip on">View rota</span><span class="chip">Swap request</span><span class="chip">Leave request</span><span class="chip">Overtime</span></div>
+        <div class="rota-code-row" id="rota-code-row"></div>
       </div>
     </div>
   </div>
 
   <div class="tab-body" id="rota-monthly">
     <div class="card mb16">
-      <div class="card-hd"><div><div class="card-title">Monthly Rota</div><div class="card-sub">Full month planning, approval, coverage, and payroll support</div></div><span class="b b-gray">Draft</span></div>
+      <div class="card-hd"><div><div class="card-title">Monthly Rota</div><div class="card-sub">Monthly overview built from saved weekly rota records</div></div><span class="b b-gray" id="rota-monthly-status">Draft</span></div>
       <div class="fr3">
-        <div class="fg"><label class="fl">Month</label><select class="fi"><option>May 2026</option><option>June 2026</option><option>July 2026</option></select></div>
-        <div class="fg"><label class="fl">Department</label><select class="fi"><option>Sales</option><option>Warehouse</option><option>Finance</option><option>All Departments</option></select></div>
-        <div class="fg"><label class="fl">Location</label><select class="fi"><option>Branch</option><option>Dubai HQ</option><option>Warehouse</option><option>All Locations</option></select></div>
-      </div>
-      <div class="fr3">
-        <div class="fg"><label class="fl">Role</label><select class="fi"><option>All Roles</option><option>Cashier</option><option>Sales</option><option>Stock</option></select></div>
-        <div class="fg"><label class="fl">Employee</label><input class="fi" placeholder="Search employee"></div>
-        <div class="fg"><label class="fl">Status</label><select class="fi"><option>Draft</option><option>Pending</option><option>Published</option><option>Locked</option></select></div>
+        <div class="fg"><label class="fl">Month</label><input class="fi mono" id="rota-month-value" type="month" value="2026-05" onchange="renderRotaBoards()"></div>
+        <div class="fg"><label class="fl">Department</label><select class="fi" id="rota-month-department" onchange="renderRotaBoards()"><option>All Departments</option><option>Sales</option><option>Warehouse</option><option>Finance</option><option>Management</option></select></div>
+        <div class="fg"><label class="fl">Employee</label><input class="fi" id="rota-month-search" placeholder="Search employee" oninput="renderRotaBoards()"></div>
       </div>
       <div class="flx" style="gap:8px;flex-wrap:wrap">
         <button class="btn btn-g btn-sm" onclick="copyPreviousMonthRota()">Copy Previous Month</button>
-        <button class="btn btn-g btn-sm" onclick="autoGenerateMonthlyRota()">Auto Generate</button>
-        <button class="btn btn-g btn-sm" onclick="saveRotaDraft()">Save Draft</button>
+        <button class="btn btn-g btn-sm" onclick="autoGenerateMonthlyRota()">Auto Fill Month</button>
+        <button class="btn btn-g btn-sm" onclick="saveRotaDraft()">Save Status</button>
         <button class="btn btn-warn btn-sm" onclick="submitRotaApproval()">Submit Approval</button>
         <button class="btn btn-p btn-sm" onclick="publishRota()">Publish</button>
       </div>
@@ -1267,90 +1151,15 @@
 
     <div class="g2 mb16" style="grid-template-columns:2fr 1fr">
       <div class="card">
-        <div class="card-hd"><div><div class="card-title">Monthly Rota Grid - May 2026</div><div class="card-sub">Click any day cell to edit day type, shift, overtime, or copy to other days</div></div></div>
-        <table class="tbl">
-          <thead><tr><th>Employee</th><th>Role</th><th>Total</th><th>OT</th><th>OFF</th><th>Leave</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>...</th><th>31</th></tr></thead>
-          <tbody>
-            <tr><td>Ahmed Rashid</td><td>Cashier</td><td class="mono">176</td><td class="mono">8</td><td class="mono">6</td><td class="mono">1</td><td onclick="showM('m-edit-month-shift')"><span class="b b-b">M</span></td><td onclick="showM('m-edit-month-shift')"><span class="b b-b">M</span></td><td onclick="showM('m-edit-month-shift')"><span class="b b-gray">OFF</span></td><td onclick="showM('m-edit-month-shift')"><span class="b b-b">M</span></td><td onclick="showM('m-edit-month-shift')"><span class="b b-t">E</span></td><td onclick="showM('m-edit-month-shift')"><span class="b b-t">E</span></td><td onclick="showM('m-edit-month-shift')"><span class="b b-a">L</span></td><td>...</td><td onclick="showM('m-edit-month-shift')"><span class="b b-b">M</span></td></tr>
-            <tr><td>Sara Al Mansouri</td><td>Sales</td><td class="mono">168</td><td class="mono">0</td><td class="mono">8</td><td class="mono">2</td><td onclick="showM('m-edit-month-shift')"><span class="b b-t">E</span></td><td onclick="showM('m-edit-month-shift')"><span class="b b-t">E</span></td><td onclick="showM('m-edit-month-shift')"><span class="b b-b">M</span></td><td onclick="showM('m-edit-month-shift')"><span class="b b-gray">OFF</span></td><td onclick="showM('m-edit-month-shift')"><span class="b b-r">L</span></td><td onclick="showM('m-edit-month-shift')"><span class="b b-a">L</span></td><td onclick="showM('m-edit-month-shift')"><span class="b b-b">M</span></td><td>...</td><td onclick="showM('m-edit-month-shift')"><span class="b b-gray">OFF</span></td></tr>
-            <tr><td>John Mathew</td><td>Stock</td><td class="mono">184</td><td class="mono">12</td><td class="mono">5</td><td class="mono">0</td><td onclick="showM('m-edit-month-shift')"><span class="b b-p">N</span></td><td onclick="showM('m-edit-month-shift')"><span class="b b-p">N</span></td><td onclick="showM('m-edit-month-shift')"><span class="b b-gray">OFF</span></td><td onclick="showM('m-edit-month-shift')"><span class="b b-b">M</span></td><td onclick="showM('m-edit-month-shift')"><span class="b b-b">M</span></td><td onclick="showM('m-edit-month-shift')"><span class="b b-p">OT</span></td><td onclick="showM('m-edit-month-shift')"><span class="b b-b">M</span></td><td>...</td><td onclick="showM('m-edit-month-shift')"><span class="b b-t">E</span></td></tr>
-          </tbody>
-        </table>
+        <div class="card-hd"><div><div class="card-title">Monthly Staff Overview</div><div class="card-sub">Shows saved assignments for the selected month</div></div></div>
+        <div class="rota-month-grid" id="rota-monthly-board"></div>
         <div class="divider"></div>
-        <div class="flx" style="gap:8px;flex-wrap:wrap"><button class="btn btn-g btn-sm" onclick="toast('Bulk shift assignment opened','info')">Bulk Assign</button><button class="btn btn-g btn-sm" onclick="toast('Bulk OFF applied','ok')">Mark OFF</button><button class="btn btn-g btn-sm" onclick="toast('Employees notified','ok')">Notify Employees</button></div>
+        <div class="flx" style="gap:8px;flex-wrap:wrap"><button class="btn btn-g btn-sm" onclick="autoGenerateMonthlyRota()">Bulk Assign</button><button class="btn btn-g btn-sm" onclick="toast('Employees notified','ok')">Notify Employees</button></div>
       </div>
       <div class="card">
         <div class="card-hd"><div class="card-title">Monthly Summary</div></div>
         <table class="tbl">
-          <tbody>
-            <tr><td>Total Employees</td><td class="mono">25</td></tr>
-            <tr><td>Scheduled Hours</td><td class="mono">4,400</td></tr>
-            <tr><td>Total OT Hours</td><td class="mono" style="color:var(--purple)">120</td></tr>
-            <tr><td>Total Leave Days</td><td class="mono" style="color:var(--amber)">38</td></tr>
-            <tr><td>Total Off Days</td><td class="mono">200</td></tr>
-            <tr><td>Conflicts</td><td class="mono" style="color:var(--red)">6</td></tr>
-            <tr><td>Shortage Days</td><td class="mono" style="color:var(--amber)">4</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <div class="g2 mb16">
-      <div class="card">
-        <div class="card-hd"><div class="card-title">Monthly Department Coverage</div></div>
-        <table class="tbl">
-          <thead><tr><th>Date</th><th>Morning</th><th>Evening</th><th>Night</th><th>Required</th><th>Status</th></tr></thead>
-          <tbody>
-            <tr><td>01 May</td><td>5/5</td><td>3/3</td><td>2/2</td><td class="mono">10</td><td><span class="b b-g">OK</span></td></tr>
-            <tr><td>02 May</td><td>4/5</td><td>3/3</td><td>1/2</td><td class="mono">10</td><td><span class="b b-a">Shortage</span></td></tr>
-            <tr><td>03 May</td><td>5/5</td><td>2/3</td><td>2/2</td><td class="mono">10</td><td><span class="b b-a">Shortage</span></td></tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="card">
-        <div class="card-hd"><div class="card-title">Monthly Conflict Rules</div></div>
-        <table class="tbl">
-          <tbody>
-            <tr><td>Employee already on leave</td><td><span class="b b-r">Red block</span></td></tr>
-            <tr><td>Double shift same day</td><td><span class="b b-r">Block</span></td></tr>
-            <tr><td>Weekly or monthly hours exceeded</td><td><span class="b b-a">Warning</span></td></tr>
-            <tr><td>Missing required staff</td><td><span class="b b-a">Yellow</span></td></tr>
-            <tr><td>Night shift rest gap violation</td><td><span class="b b-r">Red warning</span></td></tr>
-            <tr><td>Payroll locked month</td><td><span class="b b-r">Cannot edit</span></td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <div class="g3 mb16">
-      <div class="setting-tile"><strong>Auto Generate Rules</strong><p>Availability, leave, holidays, staff requirements, maximum hours, rest days, night gap, previous pattern, overtime limits, and role skills.</p></div>
-      <div class="setting-tile"><strong>Approval Flow</strong><p>Draft to supervisor review, HR approval, published, then locked for attendance and payroll use.</p></div>
-      <div class="setting-tile"><strong>Payroll Link</strong><p>Payroll can use approved rota plus actual attendance to validate planned hours and overtime.</p></div>
-    </div>
-
-    <div class="g2">
-      <div class="card">
-        <div class="card-hd"><div class="card-title">Mobile Monthly View</div></div>
-        <table class="tbl">
-          <tbody>
-            <tr><td>01 May</td><td>Morning</td><td class="mono">09:00 - 18:00</td></tr>
-            <tr><td>02 May</td><td>Evening</td><td class="mono">14:00 - 22:00</td></tr>
-            <tr><td>03 May</td><td>OFF</td><td class="mono">-</td></tr>
-            <tr><td>04 May</td><td>Leave</td><td class="mono">Approved</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="card">
-        <div class="card-hd"><div class="card-title">Monthly Reports</div></div>
-        <table class="tbl">
-          <tbody>
-            <tr><td>Monthly Rota Report</td><td>Full employee schedule</td></tr>
-            <tr><td>Department Coverage Report</td><td>Shortage check</td></tr>
-            <tr><td>Monthly Hours Report</td><td>Employee work hours</td></tr>
-            <tr><td>Overtime Planning Report</td><td>Planned OT</td></tr>
-            <tr><td>Leave Conflict Report</td><td>Leave vs rota</td></tr>
-            <tr><td>Payroll Rota Report</td><td>Payroll calculation support</td></tr>
-          </tbody>
+          <tbody id="rota-monthly-summary-tbody"></tbody>
         </table>
       </div>
     </div>
@@ -1359,13 +1168,13 @@
   <div class="tab-body" id="rota-dept">
     <div class="card mb16">
       <div class="card-hd">
-        <div><div class="card-title">Department Rota</div><div class="card-sub">Review coverage by department before submitting or publishing the rota</div></div>
-        <span class="b b-a">Needs Coverage Review</span>
+        <div><div class="card-title">Department Rota</div><div class="card-sub">Simple department coverage from saved weekly rota records</div></div>
+        <span class="b b-a" id="rota-dept-status">Needs Coverage Review</span>
       </div>
       <div class="fr3">
-        <div class="fg"><label class="fl">Department</label><select class="fi"><option>Warehouse</option><option>Sales</option><option>Finance</option><option>All Departments</option></select></div>
-        <div class="fg"><label class="fl">Period</label><select class="fi"><option>03-09 May</option><option>10-16 May</option><option>May 2026</option></select></div>
-        <div class="fg"><label class="fl">Supervisor</label><select class="fi"><option>John</option><option>Sara</option><option>Rania</option></select></div>
+        <div class="fg"><label class="fl">Department</label><select class="fi" id="rota-dept-department" onchange="renderRotaBoards()"><option>All Departments</option><option>Sales</option><option>Warehouse</option><option>Finance</option><option>Management</option></select></div>
+        <div class="fg"><label class="fl">Week Start</label><input class="fi mono" id="rota-dept-week-start" type="date" value="2026-05-04" onchange="syncRotaWeekFromDept()"></div>
+        <div class="fg"><label class="fl">Supervisor</label><input class="fi" id="rota-dept-supervisor" value="HR Manager"></div>
       </div>
       <div class="flx" style="gap:8px;flex-wrap:wrap">
         <button class="btn btn-g btn-sm" onclick="autoGenerateRota()">Auto Fill Gaps</button>
@@ -1376,28 +1185,14 @@
     </div>
     <div class="g2 mb16">
       <div class="card">
-        <div class="card-hd"><div><div class="card-title">Coverage By Shift</div><div class="card-sub">Warehouse · Supervisor: John</div></div><button class="btn btn-g btn-sm" onclick="toast('Extra staff requested','warn')">Request Staff</button></div>
-        <table class="tbl">
-          <thead><tr><th>Shift</th><th>Required</th><th>Assigned</th><th>Coverage</th><th>Status</th></tr></thead>
-          <tbody>
-            <tr><td>Morning</td><td class="mono">5</td><td class="mono">4</td><td><div class="prog-bar"><div class="prog-fill" style="width:80%;background:var(--amber)"></div></div></td><td><span class="b b-a">Shortage</span></td></tr>
-            <tr><td>Evening</td><td class="mono">3</td><td class="mono">3</td><td><div class="prog-bar"><div class="prog-fill" style="width:100%;background:var(--green)"></div></div></td><td><span class="b b-g">Covered</span></td></tr>
-            <tr><td>Night</td><td class="mono">2</td><td class="mono">1</td><td><div class="prog-bar"><div class="prog-fill" style="width:50%;background:var(--red)"></div></div></td><td><span class="b b-r">Critical</span></td></tr>
-          </tbody>
-        </table>
+        <div class="card-hd"><div><div class="card-title">Coverage By Shift</div><div class="card-sub" id="rota-dept-sub">Selected department</div></div><button class="btn btn-g btn-sm" onclick="toast('Extra staff requested','warn')">Request Staff</button></div>
+        <div class="rota-coverage-grid" id="rota-dept-coverage"></div>
       </div>
       <div class="card">
-        <div class="card-hd"><div class="card-title">Conflict Detection</div></div>
+        <div class="card-hd"><div class="card-title">Department Staff</div></div>
         <table class="tbl">
-          <thead><tr><th>Conflict</th><th>System Action</th></tr></thead>
-          <tbody>
-            <tr><td>Employee on leave</td><td><span class="b b-r">Highlight red</span></td></tr>
-            <tr><td>Double shift same day</td><td><span class="b b-r">Block</span></td></tr>
-            <tr><td>Weekly hours exceeded</td><td><span class="b b-a">Warning</span></td></tr>
-            <tr><td>Department shortage</td><td><span class="b b-a">Yellow warning</span></td></tr>
-            <tr><td>Shift overlaps</td><td><span class="b b-r">Block</span></td></tr>
-            <tr><td>Employee inactive</td><td><span class="b b-r">Block</span></td></tr>
-          </tbody>
+          <thead><tr><th>Employee</th><th>Department</th><th>Hours</th><th>Status</th></tr></thead>
+          <tbody id="rota-dept-staff-tbody"></tbody>
         </table>
       </div>
     </div>
@@ -2310,7 +2105,6 @@
   <div class="tabs">
     <div class="tab on" onclick="stab(this,'pay-in')">Received</div>
     <div class="tab" onclick="stab(this,'pay-out')">Paid</div>
-    <div class="tab" onclick="stab(this,'pay-gateway')">Gateway Settlements</div>
   </div>
   <div class="tab-body on" id="pay-in">
     <div class="card">
@@ -2334,17 +2128,6 @@
           <tr><td class="mono">PAY-2024-0097</td><td>Office Supplies UAE</td><td class="mono">BILL-2024-0181</td><td>Card</td><td>14 Jun</td><td class="mono">2,200</td><td><span class="b b-g">Posted</span></td></tr>
         </tbody>
       </table>
-    </div>
-  </div>
-  <div class="tab-body" id="pay-gateway">
-    <div class="g3 mb16">
-      <div class="stat"><div class="stat-lbl">Stripe UAE</div><div class="stat-val" style="color:var(--green)">AED 18.9K</div><div class="stat-delta">settles tomorrow</div></div>
-      <div class="stat"><div class="stat-lbl">PayTabs</div><div class="stat-val" style="color:var(--accent)">AED 7.6K</div><div class="stat-delta">2 payments</div></div>
-      <div class="stat"><div class="stat-lbl">Fees</div><div class="stat-val" style="color:var(--amber)">AED 612</div><div class="stat-delta">this month</div></div>
-    </div>
-    <div class="card">
-      <div class="card-hd"><div class="card-title">Gateway Settlements</div><button class="btn btn-g btn-sm" onclick="toast('Gateway sync started','info')">Sync</button></div>
-      <table class="tbl"><thead><tr><th>Gateway</th><th>Batch</th><th>Gross</th><th>Fees</th><th>Net</th><th>Status</th></tr></thead><tbody><tr><td>Stripe UAE</td><td class="mono">ST-0624-08</td><td class="mono">18,900</td><td class="mono">486</td><td class="mono">18,414</td><td><span class="b b-a">Pending</span></td></tr><tr><td>PayTabs</td><td class="mono">PT-0624-03</td><td class="mono">7,560</td><td class="mono">126</td><td class="mono">7,434</td><td><span class="b b-g">Settled</span></td></tr></tbody></table>
     </div>
   </div>
 </div>
@@ -4473,7 +4256,7 @@ period_locks ─&lt; audit_logs
 
 <div class="overlay" id="m-acc" onclick="closeOvBg(event,'m-acc')">
   <div class="modal"><div class="modal-title">Add Account</div><div class="modal-sub">Create new chart of account</div>
-    <div class="fr2"><div class="fg"><label class="fl">Account Code</label><input class="fi mono" id="acc-code" placeholder="6000"></div><div class="fg"><label class="fl">Account Type</label><select class="fi" id="acc-type"><option>Asset</option><option>Liability</option><option>Equity</option><option>Revenue</option><option>Expense</option></select></div></div>
+    <div class="fr2"><div class="fg"><label class="fl">Account Code</label><input class="fi mono" id="acc-code" placeholder="6000"></div><div class="fg"><label class="fl">Account Type</label><select class="fi" id="acc-type"><option>Purchase</option><option>Sales</option><option>Direct expense</option><option>Indirect expense</option><option>Direct income</option><option>Indirect income</option><option>Asset</option><option>Liability</option><option>Equity</option></select></div></div>
     <div class="fg"><label class="fl">Account Name</label><input class="fi" id="acc-name" placeholder="Account name"></div>
     <div class="fr2"><div class="fg"><label class="fl">Category</label><select class="fi" id="acc-category"><option>Current</option><option>Fixed</option><option>Direct</option><option>Indirect</option></select></div><div class="fg"><label class="fl">Parent Account</label><select class="fi" id="acc-parent"><option>None (Root)</option><option>Cash & Cash Equivalents (1000)</option><option>Accounts Receivable (1100)</option></select></div></div>
     <div class="modal-foot"><button class="btn btn-g" onclick="closeM('m-acc')">Cancel</button><button class="btn btn-p" onclick="saveAccount()">Add Account</button></div>

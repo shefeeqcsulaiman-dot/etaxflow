@@ -72,9 +72,9 @@ def seed_accounts(db: Session, company_id: str) -> None:
         ("2100", "Accounts Payable", "liability"),
         ("2200", "VAT Output Payable", "liability"),
         ("2210", "VAT Input Recoverable", "asset"),
-        ("3000", "Sales Income", "revenue"),
-        ("4000", "Purchases", "expense"),
-        ("5000", "Cost of Goods Sold", "expense"),
+        ("3000", "Sales Income", "sales"),
+        ("4000", "Purchases", "purchase"),
+        ("5000", "Cost of Goods Sold", "direct expense"),
     ]
     for code, name, account_type in rows:
         if not db.query(Account).filter(Account.company_id == company_id, Account.code == code).first():

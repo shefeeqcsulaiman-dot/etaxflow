@@ -116,6 +116,12 @@ class Account(Base, TimestampMixin):
     code: Mapped[str] = mapped_column(String(20), nullable=False)
     name: Mapped[str] = mapped_column(String(160), nullable=False)
     type: Mapped[str] = mapped_column(String(40), nullable=False)
+    parent_account_id: Mapped[str | None] = mapped_column(ForeignKey("accounts.id"))
+    opening_balance: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    currency: Mapped[str] = mapped_column(String(10), default="AED")
+    tax_applicable: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_bank_cash: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_control_account: Mapped[bool] = mapped_column(Boolean, default=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
@@ -146,6 +152,124 @@ class JournalLine(Base):
 
     journal: Mapped[JournalEntry] = relationship(back_populates="lines")
     account: Mapped[Account] = relationship()
+
+
+class VoucherType(Base, TimestampMixin):
+    __tablename__ = "voucher_types"
+    __table_args__ = (UniqueConstraint("company_id", "code", name="uq_voucher_type_company_code"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid)
+    company_id: Mapped[str] = mapped_column(ForeignKey("companies.id"), index=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    code: Mapped[str] = mapped_column(String(20), nullable=False)
+    prefix: Mapped[str] = mapped_column(String(20), nullable=False)
+    auto_numbering: Mapped[bool] = mapped_column(Boolean, default=True)
+    default_debit_account_id: Mapped[str | None] = mapped_column(ForeignKey("accounts.id"))
+    default_credit_account_id: Mapped[str | None] = mapped_column(ForeignKey("accounts.id"))
+    approval_required: Mapped[bool] = mapped_column(Boolean, default=True)
+    affects_cash_bank: Mapped[bool] = mapped_column(Boolean, default=False)
+    affects_vat: Mapped[bool] = mapped_column(Boolean, default=False)
+    status: Mapped[str] = mapped_column(String(30), default="active")
+
+
+class Voucher(Base, TimestampMixin):
+    __tablename__ = "vouchers"
+    __table_args__ = (UniqueConstraint("company_id", "voucher_no", name="uq_voucher_company_no"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid)
+    company_id: Mapped[str] = mapped_column(ForeignKey("companies.id"), index=True, nullable=False)
+    voucher_type_id: Mapped[str] = mapped_column(ForeignKey("voucher_types.id"), nullable=False)
+    voucher_no: Mapped[str] = mapped_column(String(60), nullable=False)
+    voucher_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    party: Mapped[str | None] = mapped_column(String(160))
+    cost_center: Mapped[str | None] = mapped_column(String(80))
+    narration: Mapped[str | None] = mapped_column(String(500))
+    status: Mapped[str] = mapped_column(String(30), default="draft")
+    approved_by: Mapped[str | None] = mapped_column(ForeignKey("users.id"))
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    posted_journal_id: Mapped[str | None] = mapped_column(ForeignKey("journal_entries.id"))
+    reversal_of_id: Mapped[str | None] = mapped_column(ForeignKey("vouchers.id"))
+
+    voucher_type: Mapped[VoucherType] = relationship()
+    lines: Mapped[list["VoucherLine"]] = relationship(back_populates="voucher", cascade="all, delete-orphan")
+
+
+class VoucherLine(Base):
+    __tablename__ = "voucher_lines"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid)
+    voucher_id: Mapped[str] = mapped_column(ForeignKey("vouchers.id"), nullable=False)
+    account_id: Mapped[str] = mapped_column(ForeignKey("accounts.id"), nullable=False)
+    debit: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    credit: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    party: Mapped[str | None] = mapped_column(String(160))
+    cost_center: Mapped[str | None] = mapped_column(String(80))
+    narration: Mapped[str | None] = mapped_column(String(500))
+
+    voucher: Mapped[Voucher] = relationship(back_populates="lines")
+    account: Mapped[Account] = relationship()
+
+
+class GeneralLedgerEntry(Base, TimestampMixin):
+    __tablename__ = "general_ledger_entries"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid)
+    company_id: Mapped[str] = mapped_column(ForeignKey("companies.id"), index=True, nullable=False)
+    entry_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    voucher_no: Mapped[str] = mapped_column(String(60), nullable=False)
+    voucher_type: Mapped[str] = mapped_column(String(80), nullable=False)
+    account_id: Mapped[str] = mapped_column(ForeignKey("accounts.id"), nullable=False)
+    journal_entry_id: Mapped[str | None] = mapped_column(ForeignKey("journal_entries.id"))
+    journal_line_id: Mapped[str | None] = mapped_column(ForeignKey("journal_lines.id"))
+    debit: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    credit: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    balance: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    party: Mapped[str | None] = mapped_column(String(160))
+    cost_center: Mapped[str | None] = mapped_column(String(80))
+    narration: Mapped[str | None] = mapped_column(String(500))
+
+    account: Mapped[Account] = relationship()
+
+
+class Payment(Base, TimestampMixin):
+    __tablename__ = "payments"
+    __table_args__ = (UniqueConstraint("company_id", "payment_no", name="uq_payment_company_no"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid)
+    company_id: Mapped[str] = mapped_column(ForeignKey("companies.id"), index=True, nullable=False)
+    payment_no: Mapped[str] = mapped_column(String(60), nullable=False)
+    payment_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    payment_mode: Mapped[str] = mapped_column(String(40), default="bank")
+    cash_bank_account_id: Mapped[str] = mapped_column(ForeignKey("accounts.id"), nullable=False)
+    debit_account_id: Mapped[str] = mapped_column(ForeignKey("accounts.id"), nullable=False)
+    payee_type: Mapped[str | None] = mapped_column(String(80))
+    payee_name: Mapped[str] = mapped_column(String(160), nullable=False)
+    amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    reference_no: Mapped[str | None] = mapped_column(String(80))
+    narration: Mapped[str | None] = mapped_column(String(500))
+    attachment: Mapped[str | None] = mapped_column(String(500))
+    status: Mapped[str] = mapped_column(String(30), default="draft")
+    voucher_id: Mapped[str | None] = mapped_column(ForeignKey("vouchers.id"))
+
+
+class Receipt(Base, TimestampMixin):
+    __tablename__ = "receipts"
+    __table_args__ = (UniqueConstraint("company_id", "receipt_no", name="uq_receipt_company_no"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid)
+    company_id: Mapped[str] = mapped_column(ForeignKey("companies.id"), index=True, nullable=False)
+    receipt_no: Mapped[str] = mapped_column(String(60), nullable=False)
+    receipt_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    receipt_mode: Mapped[str] = mapped_column(String(40), default="bank")
+    cash_bank_account_id: Mapped[str] = mapped_column(ForeignKey("accounts.id"), nullable=False)
+    credit_account_id: Mapped[str] = mapped_column(ForeignKey("accounts.id"), nullable=False)
+    received_from: Mapped[str] = mapped_column(String(160), nullable=False)
+    amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    reference_no: Mapped[str | None] = mapped_column(String(80))
+    narration: Mapped[str | None] = mapped_column(String(500))
+    attachment: Mapped[str | None] = mapped_column(String(500))
+    status: Mapped[str] = mapped_column(String(30), default="draft")
+    voucher_id: Mapped[str | None] = mapped_column(ForeignKey("vouchers.id"))
 
 
 class SourceTransaction(Base, TimestampMixin):
@@ -231,6 +355,112 @@ class TaxPeriod(Base, TimestampMixin):
     start_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     end_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     status: Mapped[str] = mapped_column(String(30), default="open")
+
+
+class VatReturn(Base, TimestampMixin):
+    __tablename__ = "vat_returns"
+    __table_args__ = (UniqueConstraint("company_id", "period", name="uq_vat_return_company_period"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid)
+    company_id: Mapped[str] = mapped_column(ForeignKey("companies.id"), index=True, nullable=False)
+    period: Mapped[str] = mapped_column(String(20), nullable=False)
+    sales_taxable_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    output_vat: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    purchase_taxable_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    input_vat: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    adjustments: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    net_vat: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    filing_status: Mapped[str] = mapped_column(String(30), default="draft")
+    filed_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    fta_reference_no: Mapped[str | None] = mapped_column(String(80))
+    attachment: Mapped[str | None] = mapped_column(String(500))
+    payment_voucher_id: Mapped[str | None] = mapped_column(ForeignKey("vouchers.id"))
+
+
+class CorporateTaxReturn(Base, TimestampMixin):
+    __tablename__ = "corporate_tax_returns"
+    __table_args__ = (UniqueConstraint("company_id", "tax_period", name="uq_corp_tax_return_company_period"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid)
+    company_id: Mapped[str] = mapped_column(ForeignKey("companies.id"), index=True, nullable=False)
+    tax_period: Mapped[str] = mapped_column(String(20), nullable=False)
+    accounting_profit: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    non_deductible_expenses: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    exempt_income: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    tax_loss_adjustment: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    taxable_income: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    tax_rate: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=9)
+    corporate_tax_payable: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    filing_status: Mapped[str] = mapped_column(String(30), default="draft")
+    filed_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    reference_no: Mapped[str | None] = mapped_column(String(80))
+    attachment: Mapped[str | None] = mapped_column(String(500))
+    provision_voucher_id: Mapped[str | None] = mapped_column(ForeignKey("vouchers.id"))
+    payment_voucher_id: Mapped[str | None] = mapped_column(ForeignKey("vouchers.id"))
+
+
+class BankAccount(Base, TimestampMixin):
+    __tablename__ = "bank_accounts"
+    __table_args__ = (UniqueConstraint("company_id", "account_id", name="uq_bank_account_company_account"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid)
+    company_id: Mapped[str] = mapped_column(ForeignKey("companies.id"), index=True, nullable=False)
+    account_id: Mapped[str] = mapped_column(ForeignKey("accounts.id"), nullable=False)
+    bank_name: Mapped[str] = mapped_column(String(160), nullable=False)
+    iban: Mapped[str | None] = mapped_column(String(40))
+    account_number: Mapped[str | None] = mapped_column(String(60))
+    currency: Mapped[str] = mapped_column(String(10), default="AED")
+    status: Mapped[str] = mapped_column(String(30), default="active")
+
+    account: Mapped[Account] = relationship()
+
+
+class BankStatementLine(Base, TimestampMixin):
+    __tablename__ = "bank_statement_lines"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid)
+    company_id: Mapped[str] = mapped_column(ForeignKey("companies.id"), index=True, nullable=False)
+    bank_account_id: Mapped[str] = mapped_column(ForeignKey("bank_accounts.id"), nullable=False)
+    statement_date: Mapped[str] = mapped_column(String(20), nullable=False)
+    transaction_date: Mapped[str] = mapped_column(String(20), nullable=False)
+    reference_no: Mapped[str | None] = mapped_column(String(80))
+    cheque_no: Mapped[str | None] = mapped_column(String(80))
+    narration: Mapped[str | None] = mapped_column(String(500))
+    party_name: Mapped[str | None] = mapped_column(String(160))
+    debit: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    credit: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    status: Mapped[str] = mapped_column(String(30), default="unmatched")
+
+    bank_account: Mapped[BankAccount] = relationship()
+
+
+class BankReconciliationMatch(Base, TimestampMixin):
+    __tablename__ = "bank_reconciliation_matches"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid)
+    company_id: Mapped[str] = mapped_column(ForeignKey("companies.id"), index=True, nullable=False)
+    bank_account_id: Mapped[str] = mapped_column(ForeignKey("bank_accounts.id"), nullable=False)
+    statement_line_id: Mapped[str | None] = mapped_column(ForeignKey("bank_statement_lines.id"))
+    ledger_entry_id: Mapped[str | None] = mapped_column(ForeignKey("general_ledger_entries.id"))
+    match_status: Mapped[str] = mapped_column(String(30), default="matched")
+    match_method: Mapped[str] = mapped_column(String(40), default="manual")
+    difference: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    confirmed_by: Mapped[str | None] = mapped_column(ForeignKey("users.id"))
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class PeriodLock(Base, TimestampMixin):
+    __tablename__ = "period_locks"
+    __table_args__ = (UniqueConstraint("company_id", "module", "period", name="uq_period_lock_company_module_period"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid)
+    company_id: Mapped[str] = mapped_column(ForeignKey("companies.id"), index=True, nullable=False)
+    module: Mapped[str] = mapped_column(String(60), nullable=False)
+    period: Mapped[str] = mapped_column(String(20), nullable=False)
+    status: Mapped[str] = mapped_column(String(30), default="open")
+    locked_by: Mapped[str | None] = mapped_column(ForeignKey("users.id"))
+    locked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    reason: Mapped[str | None] = mapped_column(String(255))
 
 
 class Warehouse(Base, TimestampMixin):
