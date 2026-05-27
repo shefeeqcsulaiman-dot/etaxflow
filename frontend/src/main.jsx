@@ -4,7 +4,7 @@ import QRCode from "qrcode";
 import { api, clearToken, getToken, setToken } from "./api";
 import "./styles.css";
 
-const TAXFLOW_LEGACY_VERSION = "20260523-inventory-clear-all";
+const TAXFLOW_LEGACY_VERSION = "20260524-inventory-no-demo-rows";
 
 function App() {
   const [tokenReady, setTokenReady] = useState(Boolean(getToken()));

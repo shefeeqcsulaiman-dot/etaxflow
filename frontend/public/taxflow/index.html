@@ -319,7 +319,7 @@
     <div class="tab" onclick="stab(this,'s-extract')">AI Extraction</div>
     <div class="tab" onclick="stab(this,'s-validate')">Validation</div>
     <div class="tab" onclick="stab(this,'s-invoices')">Invoices</div>
-    <div class="tab" onclick="stab(this,'s-create')">Create Invoice</div>
+    <div class="tab" onclick="openSalesAddChoice()">Add Sales</div>
     <div class="tab" onclick="stab(this,'s-customers')">Customers</div>
   </div>
 
@@ -391,11 +391,20 @@
       <div class="stat"><div class="stat-lbl">Overdue</div><div class="stat-val" style="color:var(--red);font-size:20px">AED 21,000</div></div>
     </div>
     <div class="card">
-      <div class="card-hd"><div class="card-title">All Invoices</div><div class="flx"><input class="fi" style="width:200px" placeholder="Search..."><button class="btn btn-g" onclick="stab(document.querySelector('#page-sales .tab:nth-child(1)'),'s-upload')">Upload</button><button class="btn btn-p" onclick="stab(document.querySelector('#page-sales .tab:nth-child(5)'),'s-create')">+ New</button></div></div>
+      <div class="card-hd"><div class="card-title">All Invoices</div><div class="flx"><input class="fi" style="width:200px" placeholder="Search..."><button class="btn btn-g" onclick="stab(document.querySelector('#page-sales .tab:nth-child(1)'),'s-upload')">Upload</button><button class="btn btn-p" onclick="openSalesAddChoice()">+ New</button></div></div>
       <table class="tbl">
         <thead><tr><th>Invoice No.</th><th>Customer</th><th>Date</th><th>Due Date</th><th>Amount</th><th>VAT</th><th>Total</th><th>Source</th><th>Status</th><th></th></tr></thead>
         <tbody id="sales-invoice-tbody">
           <tr data-empty-state="1"><td colspan="10" style="color:var(--text3);text-align:center">No sales invoices in database yet.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card mt16">
+      <div class="card-hd"><div class="card-title">Sales Returns</div><button class="btn btn-p btn-sm" onclick="startSalesTransaction('return')">+ Sales Return</button></div>
+      <table class="tbl">
+        <thead><tr><th>Return No.</th><th>Customer</th><th>Return Date</th><th>Reference</th><th>Amount</th><th>VAT</th><th>Total</th><th>Source</th><th>Status</th><th></th></tr></thead>
+        <tbody id="sales-return-tbody">
+          <tr data-empty-state="1"><td colspan="10" style="color:var(--text3);text-align:center">No sales returns in database yet.</td></tr>
         </tbody>
       </table>
     </div>
@@ -405,10 +414,10 @@
   <div class="tab-body" id="s-create">
     <div class="g2 mb16">
       <div class="card">
-        <div class="card-hd"><div class="card-title">Invoice Details</div></div>
+        <div class="card-hd"><div><div class="card-title" id="sales-form-title">Invoice Details</div><div class="card-sub" id="sales-form-sub">Create a sales invoice or sales return after choosing the document type</div></div></div>
         <div class="fr3 mb12">
-          <div class="fg" style="margin:0"><label class="fl">Invoice No.</label><input class="fi mono" id="inv-no" dir="auto"></div>
-          <div class="fg" style="margin:0"><label class="fl">Invoice Date</label><input class="fi" type="date" id="inv-date"></div>
+          <div class="fg" style="margin:0"><label class="fl" id="sales-no-label">Invoice No.</label><input class="fi mono" id="inv-no" dir="auto"></div>
+          <div class="fg" style="margin:0"><label class="fl" id="sales-date-label">Invoice Date</label><input class="fi" type="date" id="inv-date"></div>
           <div class="fg" style="margin:0"><label class="fl">Due Date</label><input class="fi" type="date" id="inv-due"></div>
         </div>
         <div class="fr3">
@@ -447,7 +456,7 @@
         <div class="inv-total-box">
           <div class="tot-row"><span style="color:var(--text3)">Subtotal</span><span id="subtotal" class="mono">AED 0.00</span></div>
           <div class="tot-row"><span style="color:var(--text3)">VAT (5%)</span><span id="vat-amt" class="mono" style="color:var(--accent)">AED 0.00</span></div>
-          <div class="tot-final"><span>Total</span><span id="inv-total" class="mono" style="color:var(--accent)">AED 0.00</span></div>
+          <div class="tot-final"><span id="sales-total-label">Total</span><span id="inv-total" class="mono" style="color:var(--accent)">AED 0.00</span></div>
         </div>
       </div>
     </div>
@@ -456,7 +465,7 @@
       <div class="flx">
         <button class="btn btn-g" onclick="openDraftInvoicePreview()">👁 Preview PDF</button>
         <button class="btn btn-g" onclick="openDraftInvoiceShare()">Share</button>
-        <button class="btn btn-p" onclick="saveAndSendDraftInvoice()">📤 Save and Send</button>
+        <button class="btn btn-p" id="sales-save-send-btn" onclick="saveAndSendDraftInvoice()">Save and Send</button>
       </div>
     </div>
   </div>
@@ -535,7 +544,7 @@
     <div class="tab on" onclick="stab(this,'p-upload')">Upload Documents</div>
     <div class="tab" onclick="stab(this,'p-extract')">AI Extraction</div>
     <div class="tab" onclick="stab(this,'p-validate')">Validation</div>
-    <div class="tab" onclick="stab(this,'p-manual')">Add Purchase</div>
+    <div class="tab" onclick="openPurchaseAddChoice()">Add Purchase</div>
     <div class="tab" onclick="stab(this,'p-records')">Purchase Records</div>
     <div class="tab" onclick="stab(this,'p-vendors')">Vendors</div>
     <div class="tab" onclick="stab(this,'p-master')">Purchase Settings</div>
@@ -547,11 +556,11 @@
         <div class="drop-zone mb16" id="pur-zone" onclick="document.getElementById('pur-file').click()" ondragover="dzOver(event,'pur-zone')" ondragleave="dzLeave('pur-zone')" ondrop="dzDrop(event,'pur-zone')">
           <div style="font-size:36px;margin-bottom:10px">📦</div>
           <div class="drop-title">Drop ZIP folder, PDF or Excel files</div>
-          <div class="drop-sub">Supports: .zip (batch), .pdf, .xlsx, .csv · Max 500MB</div>
+          <div class="drop-sub">Supports: .zip (batch), .pdf, .xlsx, .csv, images · Max 500MB</div>
           <div class="flx" style="justify-content:center;gap:6px;margin-top:12px">
             <span class="b b-r">PDF</span><span class="b b-g">CSV</span><span class="b b-b">XLSX</span><span class="b b-a">ZIP</span>
           </div>
-          <input type="file" id="pur-file" style="display:none" multiple accept=".pdf,.jpg,.jpeg,.png,.csv,.xlsx,.zip" onchange="purUpload(this)">
+          <input type="file" id="pur-file" style="display:none" multiple accept=".pdf,.jpg,.jpeg,.png,.bmp,.webp,.tif,.tiff,.csv,.xlsx,.zip" onchange="purUpload(this)">
         </div>
         <div class="card">
           <div class="card-hd"><div class="card-title">Upload Settings</div></div>
@@ -582,12 +591,27 @@
         <div class="flx"><button class="btn btn-g btn-sm" onclick="togglePurchaseAiSelection(true)">Select All</button><button class="btn btn-g btn-sm" onclick="runOCR()">Run Extraction</button><button class="btn btn-p btn-sm" onclick="storeExtractedPurchaseRecords()">Save All</button></div>
       </div>
       <div id="pur-validation-file-status" class="g3 mb16"></div>
-      <table class="tbl" data-delete-actions-bound="skip">
-        <thead><tr><th style="width:42px"><input type="checkbox" aria-label="Select all purchase AI invoices" onchange="togglePurchaseAiSelection(this.checked)"></th><th>Details</th><th>Actions</th><th>Invoice No.</th><th>Purchase Date</th><th>Supplier</th><th>Address</th><th>Pay Term</th><th>Product Name</th><th>Purchase Qty</th><th>Unit</th><th>Unit Cost Before Discount</th><th>Discount %</th><th>Unit Cost Before Tax</th><th>Line Total</th><th>Profit Margin %</th><th>Selling Price Inc. Tax</th><th>Discount Type</th><th>Discount Amount</th><th>Purchase Tax</th><th>Shipping Details</th><th>Shipping Charges</th><th>Paid Amount</th><th>Paid On</th><th>Payment Method</th><th>Payment Account</th><th>Payment Note</th><th>Notes</th><th>Payment Due</th><th>Validation</th></tr></thead>
-        <tbody id="ext-tbody">
-          <tr><td colspan="30" style="color:var(--text3);text-align:center">AI uploaded purchase data will appear here for validation.</td></tr>
-        </tbody>
-      </table>
+      <div class="ai-card-toolbar flx-b mb12">
+        <label class="flx" style="gap:8px"><input type="checkbox" aria-label="Select all purchase AI invoices" onchange="togglePurchaseAiSelection(this.checked)"> Select extracted invoices</label>
+        <div class="ai-card-controls">
+          <div class="segmented ai-view-toggle">
+            <button class="seg on" type="button" data-ai-view="grid" onclick="setPurchaseAiCardView('grid',this)">Grid</button>
+            <button class="seg" type="button" data-ai-view="gallery" onclick="setPurchaseAiCardView('gallery',this)">Gallery</button>
+          </div>
+          <select class="fi ai-sort-select" id="purchase-ai-sort" onchange="applyPurchaseAiSort(true)">
+            <option value="manual">Manual order</option>
+            <option value="invoice">Invoice No.</option>
+            <option value="date">Purchase Date</option>
+            <option value="supplier">Supplier</option>
+            <option value="total">Invoice Total</option>
+            <option value="validation">Validation</option>
+          </select>
+          <button class="btn btn-g btn-sm" type="button" id="purchase-ai-sort-dir" data-dir="asc" onclick="togglePurchaseAiSortDirection()">Asc</button>
+        </div>
+      </div>
+      <div id="ext-tbody" class="ai-card-grid">
+        <div class="ai-empty-state">AI uploaded purchase data will appear here for validation.</div>
+      </div>
       <div id="ext-prog" style="display:none;margin-top:14px">
         <div class="flx-b mb12"><span style="font-size:13px;color:var(--text2)">Extracting...</span><span id="ext-pct" class="mono" style="color:var(--accent)">0%</span></div>
         <div class="prog-bar"><div class="prog-fill" id="ext-fill" style="width:0%;background:var(--accent)"></div></div>
@@ -694,7 +718,7 @@
         <div class="flx">
           <button class="btn btn-g btn-sm" id="purchase-show-recent-btn" type="button" onclick="showRecentPurchaseRecords()">Show Recent</button>
           <button class="btn btn-g btn-sm" id="purchase-load-more-btn" type="button" onclick="loadMorePurchaseRecords()">Load More</button>
-          <button class="btn btn-p btn-sm" type="button" onclick="stab(document.querySelector('#page-purchase .tab:nth-child(4)'),'p-manual')">+ Manual Entry</button>
+          <button class="btn btn-p btn-sm" type="button" onclick="openPurchaseAddChoice()">+ Manual Entry</button>
         </div>
       </div>
       <table class="tbl" data-delete-actions-bound="skip">
@@ -771,9 +795,9 @@
   </div>
   <div class="tab-body on" id="bk-accounts">
     <div class="g3 mb16">
-      <div class="stat"><div class="stat-lbl">Total Balance</div><div class="stat-val" style="color:var(--green)">AED 1,842,360</div></div>
-      <div class="stat"><div class="stat-lbl">Monthly Inflow</div><div class="stat-val" style="color:var(--accent)">AED 965,000</div></div>
-      <div class="stat"><div class="stat-lbl">Monthly Outflow</div><div class="stat-val" style="color:var(--red)">AED 637,000</div></div>
+      <div class="stat"><div class="stat-lbl">Total Balance</div><div class="stat-val" style="color:var(--green)">AED 0.00</div></div>
+      <div class="stat"><div class="stat-lbl">Recorded Inflow</div><div class="stat-val" style="color:var(--accent)">AED 0.00</div></div>
+      <div class="stat"><div class="stat-lbl">Recorded Outflow</div><div class="stat-val" style="color:var(--red)">AED 0.00</div></div>
     </div>
     <div class="card mb16">
       <div class="card-hd"><div class="card-title">Registered Bank Accounts</div><button class="btn btn-p" onclick="showM('m-bank')">+ Add Account</button></div>
@@ -797,11 +821,8 @@
       </div>
       <table class="tbl">
         <thead><tr><th>Date</th><th>Description</th><th>Debit</th><th>Credit</th><th>Balance</th><th>Category</th></tr></thead>
-        <tbody>
-          <tr><td>20 Jun</td><td>Dubai Steel Co. — Invoice #0848</td><td>—</td><td class="mono" style="color:var(--green)">44,100</td><td class="mono">1,284,100</td><td><span class="b b-g">Sales</span></td></tr>
-          <tr><td>18 Jun</td><td>Al Hamad Steel — PO #0221</td><td class="mono" style="color:var(--red)">29,400</td><td>—</td><td class="mono">1,240,000</td><td><span class="b b-r">Purchase</span></td></tr>
-          <tr><td>15 Jun</td><td>Salary Transfer — June 2024</td><td class="mono" style="color:var(--red)">84,000</td><td>—</td><td class="mono">1,269,400</td><td><span class="b b-p">Payroll</span></td></tr>
-          <tr><td>12 Jun</td><td>Gulf Logistics Ltd — Invoice #0847</td><td>—</td><td class="mono" style="color:var(--green)">19,425</td><td class="mono">1,353,400</td><td><span class="b b-g">Sales</span></td></tr>
+        <tbody id="bank-transaction-tbody">
+          <tr data-empty-state="1"><td colspan="6" style="color:var(--text3);text-align:center">No bank transactions in database yet.</td></tr>
         </tbody>
       </table>
     </div>
@@ -810,9 +831,9 @@
     <div class="card">
       <div class="card-hd"><div class="card-title">Bank Reconciliation — June 2024</div><button class="btn btn-p btn-sm" onclick="toast('Reconciliation complete ✓','ok')">Auto-Reconcile</button></div>
       <div class="g3 mb16">
-        <div class="stat"><div class="stat-lbl">Bank Statement Balance</div><div class="stat-val" style="color:var(--accent);font-size:18px">AED 1,240,000</div></div>
-        <div class="stat"><div class="stat-lbl">Book Balance</div><div class="stat-val" style="color:var(--green);font-size:18px">AED 1,238,500</div></div>
-        <div class="stat"><div class="stat-lbl">Difference</div><div class="stat-val" style="color:var(--amber);font-size:18px">AED 1,500</div><div class="stat-delta dn">2 unmatched items</div></div>
+        <div class="stat"><div class="stat-lbl">Bank Statement Balance</div><div class="stat-val" id="bank-statement-balance" style="color:var(--accent);font-size:18px">AED 0.00</div></div>
+        <div class="stat"><div class="stat-lbl">Book Balance</div><div class="stat-val" id="bank-book-balance" style="color:var(--green);font-size:18px">AED 0.00</div></div>
+        <div class="stat"><div class="stat-lbl">Difference</div><div class="stat-val" id="bank-reconcile-difference" style="color:var(--amber);font-size:18px">AED 0.00</div><div class="stat-delta dn" id="bank-reconcile-note">No unmatched items</div></div>
       </div>
     </div>
   </div>
@@ -1048,7 +1069,6 @@
     <div class="tab" onclick="stab(this,'rota-dept')">Department Rota</div>
     <div class="tab" onclick="stab(this,'rota-swap')">Swap Requests</div>
     <div class="tab" onclick="stab(this,'rota-approval')">Rota Approval</div>
-    <div class="tab" onclick="stab(this,'rota-reports')">Reports</div>
   </div>
 
   <div class="tab-body on" id="rota-shifts">
@@ -1062,11 +1082,8 @@
       <div class="card-hd"><div><div class="card-title">Shift Setup</div><div class="card-sub">Define shift timing, break, grace period, and overtime threshold</div></div><button class="btn btn-p btn-sm" onclick="showM('m-shift')">+ Add Shift</button></div>
       <table class="tbl">
         <thead><tr><th>Shift Name</th><th>Code</th><th>Start</th><th>End</th><th>Break</th><th>Hours</th><th>Grace</th><th>OT After</th><th>Status</th><th></th></tr></thead>
-        <tbody>
-          <tr><td>Morning Shift</td><td class="mono">MOR</td><td class="mono">09:00</td><td class="mono">18:00</td><td>60m</td><td>8 hrs</td><td>10m</td><td>8 hrs</td><td><span class="b b-g">Active</span></td><td><button class="btn btn-g btn-sm">Edit</button></td></tr>
-          <tr><td>Evening Shift</td><td class="mono">EVE</td><td class="mono">14:00</td><td class="mono">22:00</td><td>45m</td><td>7.25 hrs</td><td>10m</td><td>8 hrs</td><td><span class="b b-g">Active</span></td><td><button class="btn btn-g btn-sm">Edit</button></td></tr>
-          <tr><td>Night Shift</td><td class="mono">NIG</td><td class="mono">21:00</td><td class="mono">06:00</td><td>60m</td><td>8 hrs</td><td>15m</td><td>8 hrs</td><td><span class="b b-g">Active</span></td><td><button class="btn btn-g btn-sm">Edit</button></td></tr>
-          <tr><td>Off Day</td><td class="mono">OFF</td><td class="mono">—</td><td class="mono">—</td><td>—</td><td>0 hrs</td><td>—</td><td>—</td><td><span class="b b-gray">System</span></td><td><button class="btn btn-g btn-sm">View</button></td></tr>
+        <tbody id="rota-shift-tbody">
+          <tr data-empty-state="1"><td colspan="10" style="color:var(--text3);text-align:center">No shifts in database yet.</td></tr>
         </tbody>
       </table>
     </div>
@@ -1094,13 +1111,11 @@
         </div>
       </div>
       <div class="flx" style="gap:8px;flex-wrap:wrap">
-        <button class="btn btn-g btn-sm" onclick="copyPreviousRota()">Copy Previous Week</button>
+        <button class="btn btn-g btn-sm" onclick="copyPreviousRota()">Copy Previous</button>
         <button class="btn btn-g btn-sm" onclick="autoGenerateRota()">Auto Generate</button>
-        <button class="btn btn-g btn-sm" onclick="toast('Draft rota saved','ok')">Save Draft</button>
+        <button class="btn btn-g btn-sm" onclick="saveRotaDraft()">Save Draft</button>
         <button class="btn btn-warn btn-sm" onclick="submitRotaApproval()">Submit Approval</button>
         <button class="btn btn-p btn-sm" onclick="publishRota()">Publish Rota</button>
-        <button class="btn btn-g btn-sm" onclick="toast('Weekly rota exported','ok')">Export PDF / Excel</button>
-        <button class="btn btn-g btn-sm" onclick="toast('Print view prepared','info')">Print</button>
       </div>
     </div>
 
@@ -1115,46 +1130,46 @@
         </div>
         <table class="tbl">
           <thead><tr><th>Employee</th><th>Role</th><th>Total Hrs</th><th>Mon 4</th><th>Tue 5</th><th>Wed 6</th><th>Thu 7</th><th>Fri 8</th><th>Sat 9</th><th>Sun 10</th></tr></thead>
-          <tbody>
+          <tbody id="rota-weekly-schedule-tbody">
             <tr>
               <td>Ahmed Rashid</td><td>Cashier</td><td class="mono">40 hrs</td>
-              <td onclick="showM('m-edit-shift')"><div class="rota-cell approved"><strong>M</strong><span>09:00-18:00</span><em>✓</em></div></td>
-              <td onclick="showM('m-edit-shift')"><div class="rota-cell approved"><strong>M</strong><span>09:00-18:00</span><em>✓</em></div></td>
-              <td onclick="showM('m-edit-shift')"><div class="rota-cell off"><strong>OFF</strong><span>-</span><em>•</em></div></td>
-              <td onclick="showM('m-edit-shift')"><div class="rota-cell draft"><strong>M</strong><span>09:00-18:00</span><em>○</em></div></td>
-              <td onclick="showM('m-edit-shift')"><div class="rota-cell draft"><strong>M</strong><span>09:00-18:00</span><em>○</em></div></td>
-              <td onclick="showM('m-edit-shift')"><div class="rota-cell approved"><strong>E</strong><span>14:00-22:00</span><em>✓</em></div></td>
-              <td onclick="showM('m-edit-shift')"><div class="rota-cell off"><strong>OFF</strong><span>-</span><em>•</em></div></td>
+              <td onclick="openRotaCellEditor(this)"><div class="rota-cell approved"><strong>M</strong><span>09:00-18:00</span><em>✓</em></div></td>
+              <td onclick="openRotaCellEditor(this)"><div class="rota-cell approved"><strong>M</strong><span>09:00-18:00</span><em>✓</em></div></td>
+              <td onclick="openRotaCellEditor(this)"><div class="rota-cell off"><strong>OFF</strong><span>-</span><em>•</em></div></td>
+              <td onclick="openRotaCellEditor(this)"><div class="rota-cell draft"><strong>M</strong><span>09:00-18:00</span><em>○</em></div></td>
+              <td onclick="openRotaCellEditor(this)"><div class="rota-cell draft"><strong>M</strong><span>09:00-18:00</span><em>○</em></div></td>
+              <td onclick="openRotaCellEditor(this)"><div class="rota-cell approved"><strong>E</strong><span>14:00-22:00</span><em>✓</em></div></td>
+              <td onclick="openRotaCellEditor(this)"><div class="rota-cell off"><strong>OFF</strong><span>-</span><em>•</em></div></td>
             </tr>
             <tr>
               <td>Sara Al Mansouri</td><td>Sales</td><td class="mono">38 hrs</td>
-              <td onclick="showM('m-edit-shift')"><div class="rota-cell approved"><strong>E</strong><span>14:00-22:00</span><em>✓</em></div></td>
-              <td onclick="showM('m-edit-shift')"><div class="rota-cell conflict"><strong>E</strong><span>14:00-22:00</span><em>!</em></div></td>
-              <td onclick="showM('m-edit-shift')"><div class="rota-cell approved"><strong>M</strong><span>09:00-18:00</span><em>✓</em></div></td>
-              <td onclick="showM('m-edit-shift')"><div class="rota-cell off"><strong>OFF</strong><span>-</span><em>•</em></div></td>
-              <td onclick="showM('m-edit-shift')"><div class="rota-cell draft"><strong>M</strong><span>09:00-18:00</span><em>○</em></div></td>
-              <td onclick="showM('m-edit-shift')"><div class="rota-cell approved"><strong>M</strong><span>09:00-18:00</span><em>✓</em></div></td>
-              <td onclick="showM('m-edit-shift')"><div class="rota-cell off"><strong>OFF</strong><span>-</span><em>•</em></div></td>
+              <td onclick="openRotaCellEditor(this)"><div class="rota-cell approved"><strong>E</strong><span>14:00-22:00</span><em>✓</em></div></td>
+              <td onclick="openRotaCellEditor(this)"><div class="rota-cell conflict"><strong>E</strong><span>14:00-22:00</span><em>!</em></div></td>
+              <td onclick="openRotaCellEditor(this)"><div class="rota-cell approved"><strong>M</strong><span>09:00-18:00</span><em>✓</em></div></td>
+              <td onclick="openRotaCellEditor(this)"><div class="rota-cell off"><strong>OFF</strong><span>-</span><em>•</em></div></td>
+              <td onclick="openRotaCellEditor(this)"><div class="rota-cell draft"><strong>M</strong><span>09:00-18:00</span><em>○</em></div></td>
+              <td onclick="openRotaCellEditor(this)"><div class="rota-cell approved"><strong>M</strong><span>09:00-18:00</span><em>✓</em></div></td>
+              <td onclick="openRotaCellEditor(this)"><div class="rota-cell off"><strong>OFF</strong><span>-</span><em>•</em></div></td>
             </tr>
             <tr>
               <td>John Mathew</td><td>Stock</td><td class="mono">45 hrs</td>
-              <td onclick="showM('m-edit-shift')"><div class="rota-cell night"><strong>N</strong><span>21:00-06:00</span><em>✓</em></div></td>
-              <td onclick="showM('m-edit-shift')"><div class="rota-cell night"><strong>N</strong><span>21:00-06:00</span><em>✓</em></div></td>
-              <td onclick="showM('m-edit-shift')"><div class="rota-cell off"><strong>OFF</strong><span>-</span><em>•</em></div></td>
-              <td onclick="showM('m-edit-shift')"><div class="rota-cell approved"><strong>M</strong><span>09:00-18:00</span><em>✓</em></div></td>
-              <td onclick="showM('m-edit-shift')"><div class="rota-cell approved"><strong>M</strong><span>09:00-18:00</span><em>✓</em></div></td>
-              <td onclick="showM('m-edit-shift')"><div class="rota-cell overtime"><strong>OT</strong><span>18:00-20:00</span><em>!</em></div></td>
-              <td onclick="showM('m-edit-shift')"><div class="rota-cell off"><strong>OFF</strong><span>-</span><em>•</em></div></td>
+              <td onclick="openRotaCellEditor(this)"><div class="rota-cell night"><strong>N</strong><span>21:00-06:00</span><em>✓</em></div></td>
+              <td onclick="openRotaCellEditor(this)"><div class="rota-cell night"><strong>N</strong><span>21:00-06:00</span><em>✓</em></div></td>
+              <td onclick="openRotaCellEditor(this)"><div class="rota-cell off"><strong>OFF</strong><span>-</span><em>•</em></div></td>
+              <td onclick="openRotaCellEditor(this)"><div class="rota-cell approved"><strong>M</strong><span>09:00-18:00</span><em>✓</em></div></td>
+              <td onclick="openRotaCellEditor(this)"><div class="rota-cell approved"><strong>M</strong><span>09:00-18:00</span><em>✓</em></div></td>
+              <td onclick="openRotaCellEditor(this)"><div class="rota-cell overtime"><strong>OT</strong><span>18:00-20:00</span><em>!</em></div></td>
+              <td onclick="openRotaCellEditor(this)"><div class="rota-cell off"><strong>OFF</strong><span>-</span><em>•</em></div></td>
             </tr>
           </tbody>
         </table>
         <div class="divider"></div>
-        <div class="flx" style="gap:8px;flex-wrap:wrap"><button class="btn btn-g btn-sm" onclick="toast('Bulk assign mode enabled','info')">Bulk Assign</button><button class="btn btn-g btn-sm" onclick="toast('Copy shift mode enabled','info')">Copy Shift</button><button class="btn btn-g btn-sm" onclick="toast('Drag and drop shifts enabled','info')">Drag & Drop</button><button class="btn btn-g btn-sm" onclick="toast('Employee notifications queued','ok')">Notify Employees</button></div>
+        <div class="flx" style="gap:8px;flex-wrap:wrap"><button class="btn btn-g btn-sm" onclick="toast('Bulk assign mode enabled','info')">Bulk Assign</button><button class="btn btn-g btn-sm" onclick="toast('Employee notifications queued','ok')">Notify Employees</button></div>
       </div>
       <div class="card">
         <div class="card-hd"><div class="card-title">Weekly Summary</div></div>
         <table class="tbl">
-          <tbody>
+          <tbody id="rota-weekly-summary-tbody">
             <tr><td>Total Employees</td><td class="mono">18</td></tr>
             <tr><td>Scheduled Hours</td><td class="mono">720</td></tr>
             <tr><td>Overtime Hours</td><td class="mono" style="color:var(--purple)">24</td></tr>
@@ -1243,13 +1258,10 @@
       </div>
       <div class="flx" style="gap:8px;flex-wrap:wrap">
         <button class="btn btn-g btn-sm" onclick="copyPreviousMonthRota()">Copy Previous Month</button>
-        <button class="btn btn-g btn-sm" onclick="toast('Selected week copied','ok')">Copy Selected Week</button>
         <button class="btn btn-g btn-sm" onclick="autoGenerateMonthlyRota()">Auto Generate</button>
-        <button class="btn btn-g btn-sm" onclick="toast('Monthly draft saved','ok')">Save Draft</button>
+        <button class="btn btn-g btn-sm" onclick="saveRotaDraft()">Save Draft</button>
         <button class="btn btn-warn btn-sm" onclick="submitRotaApproval()">Submit Approval</button>
         <button class="btn btn-p btn-sm" onclick="publishRota()">Publish</button>
-        <button class="btn btn-g btn-sm" onclick="toast('Monthly rota PDF exported','ok')">Export PDF</button>
-        <button class="btn btn-g btn-sm" onclick="toast('Monthly rota Excel exported','ok')">Export Excel</button>
       </div>
     </div>
 
@@ -1265,7 +1277,7 @@
           </tbody>
         </table>
         <div class="divider"></div>
-        <div class="flx" style="gap:8px;flex-wrap:wrap"><button class="btn btn-g btn-sm" onclick="toast('Bulk shift assignment opened','info')">Bulk Assign Shifts</button><button class="btn btn-g btn-sm" onclick="toast('Bulk OFF applied','ok')">Bulk Mark OFF</button><button class="btn btn-g btn-sm" onclick="toast('Holiday assignment opened','info')">Bulk Holidays</button><button class="btn btn-g btn-sm" onclick="toast('Print view prepared','info')">Print Rota</button><button class="btn btn-g btn-sm" onclick="toast('Employees notified','ok')">Notify Employees</button><button class="btn btn-warn btn-sm" onclick="toast('Month locked after approval','warn')">Lock Month</button></div>
+        <div class="flx" style="gap:8px;flex-wrap:wrap"><button class="btn btn-g btn-sm" onclick="toast('Bulk shift assignment opened','info')">Bulk Assign</button><button class="btn btn-g btn-sm" onclick="toast('Bulk OFF applied','ok')">Mark OFF</button><button class="btn btn-g btn-sm" onclick="toast('Employees notified','ok')">Notify Employees</button></div>
       </div>
       <div class="card">
         <div class="card-hd"><div class="card-title">Monthly Summary</div></div>
@@ -1345,9 +1357,26 @@
   </div>
 
   <div class="tab-body" id="rota-dept">
+    <div class="card mb16">
+      <div class="card-hd">
+        <div><div class="card-title">Department Rota</div><div class="card-sub">Review coverage by department before submitting or publishing the rota</div></div>
+        <span class="b b-a">Needs Coverage Review</span>
+      </div>
+      <div class="fr3">
+        <div class="fg"><label class="fl">Department</label><select class="fi"><option>Warehouse</option><option>Sales</option><option>Finance</option><option>All Departments</option></select></div>
+        <div class="fg"><label class="fl">Period</label><select class="fi"><option>03-09 May</option><option>10-16 May</option><option>May 2026</option></select></div>
+        <div class="fg"><label class="fl">Supervisor</label><select class="fi"><option>John</option><option>Sara</option><option>Rania</option></select></div>
+      </div>
+      <div class="flx" style="gap:8px;flex-wrap:wrap">
+        <button class="btn btn-g btn-sm" onclick="autoGenerateRota()">Auto Fill Gaps</button>
+        <button class="btn btn-g btn-sm" onclick="saveRotaDraft()">Save Draft</button>
+        <button class="btn btn-warn btn-sm" onclick="submitRotaApproval()">Submit Approval</button>
+        <button class="btn btn-p btn-sm" onclick="publishRota()">Publish</button>
+      </div>
+    </div>
     <div class="g2 mb16">
       <div class="card">
-        <div class="card-hd"><div><div class="card-title">Department Rota</div><div class="card-sub">Warehouse · Supervisor: John</div></div><button class="btn btn-g btn-sm" onclick="toast('Extra staff requested','warn')">Request Staff</button></div>
+        <div class="card-hd"><div><div class="card-title">Coverage By Shift</div><div class="card-sub">Warehouse · Supervisor: John</div></div><button class="btn btn-g btn-sm" onclick="toast('Extra staff requested','warn')">Request Staff</button></div>
         <table class="tbl">
           <thead><tr><th>Shift</th><th>Required</th><th>Assigned</th><th>Coverage</th><th>Status</th></tr></thead>
           <tbody>
@@ -1380,7 +1409,7 @@
         <div class="card-hd"><div><div class="card-title">Shift Swap Requests</div><div class="card-sub">Employee request, peer acceptance, supervisor approval</div></div><button class="btn btn-p btn-sm" onclick="showM('m-shift-swap')">+ Swap Request</button></div>
         <table class="tbl">
           <thead><tr><th>Requester</th><th>My Shift</th><th>Swap With</th><th>Target Shift</th><th>Status</th><th></th></tr></thead>
-          <tbody>
+          <tbody id="rota-swap-tbody">
             <tr><td>Ahmed Rashid</td><td>Mon Morning</td><td>Sara</td><td>Tue Evening</td><td><span class="b b-a">Peer Pending</span></td><td><button class="btn btn-g btn-sm">View</button></td></tr>
             <tr><td>Rania Abboud</td><td>Fri OT</td><td>Mohamed</td><td>Sat Morning</td><td><span class="b b-a">Supervisor Review</span></td><td><div class="flx"><button class="btn btn-success btn-sm" onclick="approveRotaRow(this,'Swap approved')">Approve</button><button class="btn btn-danger btn-sm" onclick="rejectRotaRow(this,'Swap rejected')">Reject</button></div></td></tr>
           </tbody>
@@ -1401,7 +1430,7 @@
         <div class="card-hd"><div class="card-title">Rota Approval Workflow</div></div>
         <table class="tbl">
           <thead><tr><th>Department</th><th>Period</th><th>Supervisor</th><th>Status</th><th></th></tr></thead>
-          <tbody>
+          <tbody id="rota-approval-tbody">
             <tr><td>Sales</td><td>03-09 May</td><td>Sara</td><td><span class="b b-a">Pending Supervisor Review</span></td><td><div class="flx"><button class="btn btn-success btn-sm" onclick="approveRotaRow(this,'Rota approved')">Approve</button><button class="btn btn-danger btn-sm" onclick="rejectRotaRow(this,'Rota rejected')">Reject</button></div></td></tr>
             <tr><td>Warehouse</td><td>03-09 May</td><td>John</td><td><span class="b b-g">Approved</span></td><td><button class="btn btn-p btn-sm" onclick="publishRota()">Publish</button></td></tr>
             <tr><td>Finance</td><td>03-09 May</td><td>Rania</td><td><span class="b b-gray">Draft</span></td><td><button class="btn btn-g btn-sm">Review</button></td></tr>
@@ -1722,20 +1751,17 @@
 
   <div class="tab-body on" id="inv-stock">
     <div class="g4 mb16">
-      <div class="stat"><div class="stat-lbl">Total Items</div><div class="stat-val" style="color:var(--accent)">156</div><div class="stat-delta">in catalogue</div></div>
-      <div class="stat"><div class="stat-lbl">In Stock</div><div class="stat-val" style="color:var(--green)">142</div><div class="stat-delta">available</div></div>
-      <div class="stat"><div class="stat-lbl">Low Stock</div><div class="stat-val" style="color:var(--amber)">8</div><div class="stat-delta">below reorder level</div></div>
-      <div class="stat"><div class="stat-lbl">Out of Stock</div><div class="stat-val" style="color:var(--red)">6</div><div class="stat-delta">need reorder</div></div>
+      <div class="stat"><div class="stat-lbl">Total Items</div><div class="stat-val" style="color:var(--accent)">0</div><div class="stat-delta">from database</div></div>
+      <div class="stat"><div class="stat-lbl">In Stock</div><div class="stat-val" style="color:var(--green)">0</div><div class="stat-delta">available</div></div>
+      <div class="stat"><div class="stat-lbl">Low Stock</div><div class="stat-val" style="color:var(--amber)">0</div><div class="stat-delta">below reorder level</div></div>
+      <div class="stat"><div class="stat-lbl">Out of Stock</div><div class="stat-val" style="color:var(--red)">0</div><div class="stat-delta">need reorder</div></div>
     </div>
     <div class="card">
-      <div class="card-hd"><div class="card-title">Current Stock Levels</div><div class="flx"><button class="btn btn-g" onclick="clearInventoryTable()">Clear Table</button><button class="btn btn-p" onclick="openInventoryItemModal()">+ Add Item</button></div></div>
+      <div class="card-hd"><div class="card-title">Current Stock Levels</div><div class="flx"><button class="btn btn-g" onclick="inventoryBulkDeleteSelected('stock-level-tbody')">Bulk Delete</button><button class="btn btn-g" onclick="clearInventoryTable()">Clear Table</button><button class="btn btn-p" onclick="openInventoryItemModal()">+ Add Item</button></div></div>
       <table class="tbl">
         <thead><tr><th>Item Code</th><th>Item Name</th><th>Category</th><th>Current Stock</th><th>Unit</th><th>Reorder Level</th><th>Status</th><th></th></tr></thead>
         <tbody id="stock-level-tbody">
-          <tr><td class="mono">ITM-001</td><td>Steel Rods 12mm</td><td><span class="b b-gray">Materials</span></td><td class="mono">500</td><td>Ton</td><td class="mono">50</td><td><span class="b b-g">OK</span></td><td><button class="btn btn-g btn-sm">View</button></td></tr>
-          <tr><td class="mono">ITM-002</td><td>Packaging Box A</td><td><span class="b b-gray">Supplies</span></td><td class="mono">20</td><td>Pcs</td><td class="mono">50</td><td><span class="b b-a">Low</span></td><td><button class="btn btn-g btn-sm">View</button></td></tr>
-          <tr><td class="mono">ITM-003</td><td>Industrial Oil 5L</td><td><span class="b b-gray">Supplies</span></td><td class="mono">0</td><td>Unit</td><td class="mono">20</td><td><span class="b b-r">Out</span></td><td><button class="btn btn-g btn-sm">View</button></td></tr>
-          <tr><td class="mono">ITM-004</td><td>Safety Gloves</td><td><span class="b b-gray">PPE</span></td><td class="mono">200</td><td>Pairs</td><td class="mono">100</td><td><span class="b b-g">OK</span></td><td><button class="btn btn-g btn-sm">View</button></td></tr>
+          <tr data-empty-state="1"><td colspan="8" style="color:var(--text3);text-align:center">No stock items in database yet.</td></tr>
         </tbody>
       </table>
     </div>
@@ -1743,13 +1769,11 @@
 
   <div class="tab-body" id="inv-items">
     <div class="card">
-      <div class="card-hd"><div class="card-title">Item Master</div><button class="btn btn-p" onclick="openInventoryItemModal()">+ New Item</button></div>
+      <div class="card-hd"><div class="card-title">Item Master</div><div class="flx"><button class="btn btn-g" onclick="inventoryBulkDeleteSelected('prod-tbody')">Bulk Delete</button><button class="btn btn-p" onclick="openInventoryItemModal()">+ New Item</button></div></div>
       <table class="tbl">
         <thead><tr><th>Code</th><th>Name</th><th>Type</th><th>Category</th><th>Unit</th><th>Default Warehouse</th><th>Tracking</th><th>VAT</th><th>Status</th></tr></thead>
         <tbody id="prod-tbody">
-          <tr><td class="mono">ITM-001</td><td>Steel Rods 12mm</td><td>Raw Material</td><td>Materials</td><td>Ton</td><td>Main Store</td><td><span class="b b-g">Yes</span></td><td><span class="b b-b">5%</span></td><td><span class="b b-g">Active</span></td></tr>
-          <tr><td class="mono">ITM-002</td><td>Packaging Box A</td><td>Consumable</td><td>Supplies</td><td>Pcs</td><td>Main Store</td><td><span class="b b-a">Optional</span></td><td><span class="b b-b">5%</span></td><td><span class="b b-g">Active</span></td></tr>
-          <tr><td class="mono">ITM-003</td><td>Industrial Oil 5L</td><td>Stock Item</td><td>Supplies</td><td>Unit</td><td>Van Stock</td><td><span class="b b-g">Yes</span></td><td><span class="b b-b">5%</span></td><td><span class="b b-g">Active</span></td></tr>
+          <tr data-empty-state="1"><td colspan="9" style="color:var(--text3);text-align:center">No products in database yet.</td></tr>
         </tbody>
       </table>
     </div>
@@ -1759,17 +1783,14 @@
     <div class="card">
       <div class="card-hd"><div class="card-title">Stock Movement History</div>
         <div class="flx">
-          <select class="fi" style="width:150px"><option>All Items</option><option>Steel Rods 12mm</option><option>Packaging Box A</option></select>
+          <select class="fi" style="width:150px"><option>All Items</option></select>
           <select class="fi" style="width:130px"><option>June 2024</option></select>
         </div>
       </div>
       <table class="tbl">
         <thead><tr><th>Date</th><th>Type</th><th>Item</th><th>Qty In</th><th>Qty Out</th><th>Balance</th><th>Reference</th></tr></thead>
         <tbody id="stock-movement-tbody">
-          <tr><td>20 Jun</td><td><span class="b b-g">Purchase</span></td><td>Steel Rods 12mm</td><td class="mono" style="color:var(--green)">+50</td><td class="mono">—</td><td class="mono">500</td><td class="mono">PUR-2024-0221</td></tr>
-          <tr><td>18 Jun</td><td><span class="b b-r">Sales</span></td><td>Steel Rods 12mm</td><td>—</td><td class="mono" style="color:var(--red)">-20</td><td class="mono">450</td><td class="mono">INV-2024-0848</td></tr>
-          <tr><td>15 Jun</td><td><span class="b b-g">Purchase</span></td><td>Packaging Box A</td><td class="mono" style="color:var(--green)">+100</td><td>—</td><td class="mono">120</td><td class="mono">PUR-2024-0219</td></tr>
-          <tr><td>10 Jun</td><td><span class="b b-r">Sales</span></td><td>Packaging Box A</td><td>—</td><td class="mono" style="color:var(--red)">-50</td><td class="mono">20</td><td class="mono">INV-2024-0845</td></tr>
+          <tr data-empty-state="1"><td colspan="7" style="color:var(--text3);text-align:center">No stock movements in database yet.</td></tr>
         </tbody>
       </table>
     </div>
@@ -1778,21 +1799,21 @@
   <div class="tab-body" id="inv-mapping">
     <div class="g2 mb16">
       <div class="card">
-        <div class="card-hd"><div><div class="card-title">Stock Mapping</div><div class="card-sub">Item Master list with TaxFlow mapping status</div></div><button class="btn btn-p btn-sm" type="button" onclick="openNewStockMap()">+ Add Mapping</button></div>
+        <div class="card-hd"><div><div class="card-title">Stock Mapping</div><div class="card-sub">Item Master list with TaxFlow mapping status</div></div><div class="flx"><button class="btn btn-g btn-sm" type="button" onclick="inventoryBulkDeleteSelected('stock-map-tbody')">Bulk Delete</button><button class="btn btn-p btn-sm" type="button" onclick="openNewStockMap()">+ Add Mapping</button></div></div>
         <table class="tbl" data-delete-actions-bound="skip">
-          <thead><tr><th>Name</th><th>Supplier Name</th><th>TaxFlow Name</th><th>Units/Outer</th><th>Mapping Status</th><th>Actions</th></tr></thead>
+          <thead><tr><th>Display Name</th><th>Supplier Name</th><th>TaxFlow Name</th><th>Units/Outer</th><th>Mapping Status</th><th>Actions</th></tr></thead>
           <tbody id="stock-map-tbody">
             <tr data-empty-state="1"><td colspan="6" style="color:var(--text3);font-size:13px">Open Item Master or sync database to load stock mappings.</td></tr>
           </tbody>
         </table>
       </div>
       <div class="card">
-        <div class="card-hd"><div><div class="card-title">Edit Mapping</div><div class="card-sub">Update supplier and TaxFlow name for the selected item</div></div></div>
+        <div class="card-hd"><div><div class="card-title">Edit Mapping</div><div class="card-sub">Update display, supplier, and TaxFlow names for the selected item</div></div></div>
         <div id="stock-map-empty" style="color:var(--text3);font-size:13px;line-height:1.6">Select an item from the mapping list to edit.</div>
         <div id="stock-map-panel" class="hidden">
-          <div class="fg"><label class="fl">Name</label><input class="fi" id="stock-map-product" placeholder="Item master name"></div>
+          <div class="fg"><label class="fl">Display Name</label><div class="flx"><input class="fi" id="stock-map-product" placeholder="Display name"><button class="btn btn-g" type="button" onclick="generateStockMapField()">Suggest Name</button></div></div>
           <div class="fg"><label class="fl">Supplier Name</label><input class="fi" id="stock-map-supplier" placeholder="Supplier name"></div>
-          <div class="fg"><label class="fl">TaxFlow Name</label><div class="flx"><input class="fi" id="stock-map-generated" placeholder="TaxFlow mapped name"><button class="btn btn-g" type="button" onclick="generateStockMapField()">Generate</button></div></div>
+          <div class="fg"><label class="fl">TaxFlow Name</label><input class="fi" id="stock-map-generated" placeholder="TaxFlow mapped name"></div>
           <div class="fg"><label class="fl">Units/Outer</label><input class="fi mono" id="stock-map-units-outer" value="1" placeholder="1"></div>
           <div class="section-hd">Pricing</div>
           <div class="pricing-line">
@@ -1888,13 +1909,11 @@
 <div class="page" id="page-accounting">
   <div class="tabs">
     <div class="tab on" onclick="stab(this,'acc-chart')">Chart of Accounts</div>
-    <div class="tab" onclick="stab(this,'acc-journal')">Journal Entries</div>
+    <div class="tab" onclick="stab(this,'acc-voucher')">Voucher Type</div>
     <div class="tab" onclick="stab(this,'acc-ledger')">General Ledger</div>
-    <div class="tab" onclick="stab(this,'acc-subledger')">Sub-Ledgers</div>
     <div class="tab" onclick="stab(this,'acc-payrec')">Payments / Receipts</div>
+    <div class="tab" onclick="stab(this,'acc-filing')">Statutory Filing</div>
     <div class="tab" onclick="stab(this,'acc-bankrec')">Bank Reconciliation</div>
-    <div class="tab" onclick="stab(this,'acc-tax')">VAT / Tax</div>
-    <div class="tab" onclick="stab(this,'acc-closing')">Closing Period</div>
   </div>
 
   <div class="tab-body on" id="acc-chart">
@@ -1915,15 +1934,34 @@
     </div>
   </div>
 
-  <div class="tab-body" id="acc-journal">
+  <div class="tab-body" id="acc-voucher">
+    <div class="g4 mb16">
+      <div class="stat"><div class="stat-lbl">Sales Voucher</div><div class="stat-val" style="color:var(--green);font-size:20px">Active</div><div class="stat-delta">customer invoices</div></div>
+      <div class="stat"><div class="stat-lbl">Purchase Voucher</div><div class="stat-val" style="color:var(--accent);font-size:20px">Active</div><div class="stat-delta">supplier bills</div></div>
+      <div class="stat"><div class="stat-lbl">Receipt Voucher</div><div class="stat-val" style="color:var(--purple);font-size:20px">Active</div><div class="stat-delta">collections</div></div>
+      <div class="stat"><div class="stat-lbl">Payment Voucher</div><div class="stat-val" style="color:var(--amber);font-size:20px">Active</div><div class="stat-delta">payments</div></div>
+    </div>
     <div class="card mb16">
-      <div class="card-hd"><div class="card-title">Create Journal Entry</div></div>
+      <div class="card-hd"><div><div class="card-title">Voucher Types</div><div class="card-sub">Numbering, source, and default posting behavior</div></div></div>
+      <table class="tbl">
+        <thead><tr><th>Voucher</th><th>Prefix</th><th>Default Debit</th><th>Default Credit</th><th>Source</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>Sales Voucher</td><td class="mono">SV</td><td>Accounts Receivable</td><td>Sales Revenue / Output VAT</td><td>Sales Invoices</td><td><span class="b b-g">Active</span></td></tr>
+          <tr><td>Purchase Voucher</td><td class="mono">PV</td><td>Expense / Inventory / Input VAT</td><td>Accounts Payable</td><td>Purchases</td><td><span class="b b-g">Active</span></td></tr>
+          <tr><td>Receipt Voucher</td><td class="mono">RV</td><td>Bank / Cash</td><td>Customer Receivable</td><td>Receipts</td><td><span class="b b-g">Active</span></td></tr>
+          <tr><td>Payment Voucher</td><td class="mono">PAY</td><td>Supplier / Expense Payable</td><td>Bank / Cash</td><td>Payments</td><td><span class="b b-g">Active</span></td></tr>
+          <tr><td>Journal Voucher</td><td class="mono">JV</td><td>Manual</td><td>Manual</td><td>Adjustments</td><td><span class="b b-g">Active</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card mb16">
+      <div class="card-hd"><div><div class="card-title">Create Voucher Entry</div><div class="card-sub">Balanced voucher lines post into the General Ledger</div></div></div>
       <div class="fr3 mb12">
         <div class="fg" style="margin:0"><label class="fl">Date</label><input class="fi" type="date" id="journal-date"></div>
-        <div class="fg" style="margin:0"><label class="fl">Reference No.</label><input class="fi mono" id="journal-ref" placeholder="JE-2024-XXXX"></div>
-        <div class="fg" style="margin:0"><label class="fl">Source</label><select class="fi" id="journal-source"><option>Manual</option><option>Sales</option><option>Purchase</option><option>Payroll</option><option>Inventory</option></select></div>
+        <div class="fg" style="margin:0"><label class="fl">Voucher No.</label><input class="fi mono" id="journal-ref" placeholder="JV-2024-XXXX"></div>
+        <div class="fg" style="margin:0"><label class="fl">Voucher Type</label><select class="fi" id="journal-source"><option>Journal Voucher</option><option>Sales Voucher</option><option>Purchase Voucher</option><option>Receipt Voucher</option><option>Payment Voucher</option></select></div>
       </div>
-      <div class="fg"><label class="fl">Description</label><input class="fi" id="journal-desc" placeholder="Entry description"></div>
+      <div class="fg"><label class="fl">Narration</label><input class="fi" id="journal-desc" placeholder="Voucher narration"></div>
       <div style="display:grid;grid-template-columns:3fr 1fr 1fr 28px;gap:8px;margin-bottom:8px">
         <div style="font-size:10.5px;color:var(--text3);text-transform:uppercase">Account</div>
         <div style="font-size:10.5px;color:var(--text3);text-transform:uppercase">Debit (AED)</div>
@@ -1944,7 +1982,7 @@
       </div>
     </div>
     <div class="flx-b">
-      <button class="btn btn-g" onclick="saveJournalDraft()">💾 Save Draft</button>
+      <button class="btn btn-g" onclick="saveJournalDraft()">Save Draft</button>
       <div class="flx"><button class="btn btn-g" onclick="saveJournalDraft()">Save Draft</button><button class="btn btn-p" onclick="postJournalEntry()">Post Entry</button></div>
     </div>
   </div>
@@ -1968,45 +2006,10 @@
     </div>
   </div>
 
-  <div class="tab-body" id="acc-subledger">
-    <div class="g2 mb16">
-      <div class="card">
-        <div class="card-hd"><div class="card-title">Customer Ledger</div></div>
-        <table class="tbl">
-          <thead><tr><th>Customer</th><th>Invoices</th><th>Receipts</th><th>Credit Notes</th><th>Outstanding</th><th>Aging</th></tr></thead>
-          <tbody>
-            <tr><td>Dubai Steel Co.</td><td class="mono">84,000</td><td class="mono">44,100</td><td class="mono">0</td><td class="mono">39,900</td><td><span class="b b-a">1-30</span></td></tr>
-            <tr><td>Gulf Logistics Ltd</td><td class="mono">19,425</td><td class="mono">19,425</td><td class="mono">0</td><td class="mono">0</td><td><span class="b b-g">Clear</span></td></tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="card">
-        <div class="card-hd"><div class="card-title">Supplier Ledger</div></div>
-        <table class="tbl">
-          <thead><tr><th>Supplier</th><th>Bills</th><th>Payments</th><th>Debit Notes</th><th>Payable</th><th>Aging</th></tr></thead>
-          <tbody>
-            <tr><td>Al Hamad Steel</td><td class="mono">29,400</td><td class="mono">0</td><td class="mono">0</td><td class="mono">29,400</td><td><span class="b b-a">Current</span></td></tr>
-            <tr><td>UAE Paints Co.</td><td class="mono">5,880</td><td class="mono">5,880</td><td class="mono">0</td><td class="mono">0</td><td><span class="b b-g">Clear</span></td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-    <div class="g2">
-      <div class="card">
-        <div class="card-hd"><div class="card-title">Employee Ledger</div></div>
-        <table class="tbl"><thead><tr><th>Employee</th><th>Salary Payable</th><th>Loans</th><th>Advances</th><th>Deductions</th><th>Payments</th></tr></thead><tbody><tr><td>Ahmed Rashid</td><td class="mono">8,500</td><td class="mono">0</td><td class="mono">500</td><td class="mono">550</td><td><span class="b b-a">Pending</span></td></tr><tr><td>Rania Abboud</td><td class="mono">7,200</td><td class="mono">0</td><td class="mono">0</td><td class="mono">300</td><td><span class="b b-g">Ready</span></td></tr></tbody></table>
-      </div>
-      <div class="card">
-        <div class="card-hd"><div class="card-title">Fixed Asset Ledger</div></div>
-        <table class="tbl"><thead><tr><th>Asset</th><th>Cost</th><th>Accum. Dep.</th><th>Book Value</th><th>Status</th></tr></thead><tbody><tr><td>Delivery Van</td><td class="mono">95,000</td><td class="mono">18,000</td><td class="mono">77,000</td><td><span class="b b-g">Active</span></td></tr><tr><td>Warehouse Racking</td><td class="mono">42,000</td><td class="mono">6,500</td><td class="mono">35,500</td><td><span class="b b-g">Active</span></td></tr></tbody></table>
-      </div>
-    </div>
-  </div>
-
   <div class="tab-body" id="acc-payrec">
     <div class="g2 mb16">
       <div class="card">
-        <div class="card-hd"><div><div class="card-title">Receipts</div><div class="card-sub">Customer, cash, bank, online, card, Tabby, and payment link receipts</div></div><button class="btn btn-p btn-sm" onclick="showM('m-payment')">+ Receipt</button></div>
+        <div class="card-hd"><div><div class="card-title">Receipts</div><div class="card-sub">Customer, cash, bank, online, card, Tabby, and payment link receipts</div></div><button class="btn btn-p btn-sm" onclick="openPaymentModal('Customer Receipt')">+ Receipt</button></div>
         <table class="tbl">
           <thead><tr><th>Date</th><th>Type</th><th>Party</th><th>Account</th><th>Amount</th><th>Status</th></tr></thead>
           <tbody>
@@ -2016,7 +2019,7 @@
         </table>
       </div>
       <div class="card">
-        <div class="card-hd"><div><div class="card-title">Payments</div><div class="card-sub">Supplier, expense, payroll, cash, and bank payments</div></div><button class="btn btn-p btn-sm" onclick="showM('m-payment')">+ Payment</button></div>
+        <div class="card-hd"><div><div class="card-title">Payments</div><div class="card-sub">Supplier, expense, payroll, cash, and bank payments</div></div><button class="btn btn-p btn-sm" onclick="openPaymentModal('Supplier Payment')">+ Payment</button></div>
         <table class="tbl">
           <thead><tr><th>Date</th><th>Type</th><th>Party</th><th>Account</th><th>Amount</th><th>Status</th></tr></thead>
           <tbody>
@@ -2029,6 +2032,42 @@
     <div class="card">
       <div class="card-hd"><div class="card-title">Payment Fields</div></div>
       <table class="tbl"><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody><tr><td>Payment Date</td><td>Date</td><td>Required transaction date</td></tr><tr><td>Payment Type</td><td>Bank / Cash / Card / Online</td><td>Controls posting account</td></tr><tr><td>Party Type</td><td>Customer / Supplier / Employee / Other</td><td>Links sub-ledger</td></tr><tr><td>Status</td><td>Draft / Posted / Reconciled</td><td>Posted entries update GL</td></tr></tbody></table>
+    </div>
+  </div>
+
+  <div class="tab-body" id="acc-filing">
+    <div class="g2 mb16">
+      <div class="card">
+        <div class="card-hd"><div><div class="card-title">Corporate Tax</div><div class="card-sub">Accounting profit, tax adjustments, taxable income, and CT payable</div></div><button class="btn btn-g btn-sm" onclick="go('corporate')">Open Detail</button></div>
+        <div class="g2 mb12">
+          <div class="stat"><div class="stat-lbl">Taxable Income</div><div class="stat-val" style="color:var(--purple)">Loading...</div><div class="stat-delta">from database</div></div>
+          <div class="stat"><div class="stat-lbl">Corporate Tax</div><div class="stat-val" style="color:var(--green)">Loading...</div><div class="stat-delta">draft filing</div></div>
+        </div>
+        <table class="tbl">
+          <thead><tr><th>Line</th><th>Amount</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td>Accounting Profit</td><td class="mono">Loading...</td><td><span class="b b-a">Review</span></td></tr>
+            <tr><td>Tax Adjustments</td><td class="mono">Loading...</td><td><span class="b b-a">Draft</span></td></tr>
+            <tr><td>Corporate Tax Payable</td><td class="mono">Loading...</td><td><span class="b b-a">Draft</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card">
+        <div class="card-hd"><div><div class="card-title">VAT</div><div class="card-sub">Output VAT, input VAT, and net payable/refundable position</div></div><button class="btn btn-g btn-sm" onclick="go('reports');setTimeout(()=>stab(document.querySelector('#page-reports .tab:nth-child(2)'),'rep-vat'),50)">Open VAT Report</button></div>
+        <div class="g3 mb12">
+          <div class="stat"><div class="stat-lbl">Output VAT</div><div class="stat-val" style="color:var(--accent)">Loading...</div></div>
+          <div class="stat"><div class="stat-lbl">Input VAT</div><div class="stat-val" style="color:var(--green)">Loading...</div></div>
+          <div class="stat"><div class="stat-lbl">Net VAT</div><div class="stat-val" style="color:var(--amber)">Loading...</div></div>
+        </div>
+        <table class="tbl">
+          <thead><tr><th>Filing Area</th><th>Check</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td>Sales VAT</td><td>Output VAT from posted sales tax lines</td><td><span class="b b-a">Review</span></td></tr>
+            <tr><td>Purchase VAT</td><td>Input VAT from validated supplier invoices</td><td><span class="b b-a">Review</span></td></tr>
+            <tr><td>Return Approval</td><td>Export only after review and approval</td><td><span class="b b-a">Draft</span></td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 
@@ -2050,45 +2089,6 @@
           <tr><td>AED 500 Bank Charge</td><td>—</td><td><span class="b b-r">0%</span></td><td><span class="b b-r">Unmatched</span></td><td><button class="btn btn-p btn-sm">Create Journal</button></td></tr>
         </tbody>
       </table>
-    </div>
-  </div>
-
-  <div class="tab-body" id="acc-tax">
-    <div class="g3 mb16">
-      <div class="stat"><div class="stat-lbl">Sales VAT</div><div class="stat-val" style="color:var(--green)">AED 44.2K</div></div>
-      <div class="stat"><div class="stat-lbl">Purchase VAT</div><div class="stat-val" style="color:var(--accent)">AED 27.8K</div></div>
-      <div class="stat"><div class="stat-lbl">Net VAT Payable</div><div class="stat-val" style="color:var(--amber)">AED 16.4K</div></div>
-    </div>
-    <div class="card">
-      <div class="card-hd"><div><div class="card-title">VAT / Tax Report</div><div class="card-sub">VAT Output = sales VAT, VAT Input = purchase and expense VAT</div></div><button class="btn btn-g btn-sm" onclick="toast('VAT report exported','ok')">Export</button></div>
-      <table class="tbl">
-        <thead><tr><th>Field</th><th>Amount</th><th>Filing Status</th></tr></thead>
-        <tbody>
-          <tr><td>Sales Taxable Amount</td><td class="mono">884,000</td><td><span class="b b-g">Ready</span></td></tr>
-          <tr><td>Sales VAT</td><td class="mono">44,200</td><td><span class="b b-g">Ready</span></td></tr>
-          <tr><td>Purchase Taxable Amount</td><td class="mono">556,000</td><td><span class="b b-g">Ready</span></td></tr>
-          <tr><td>Purchase VAT</td><td class="mono">27,800</td><td><span class="b b-a">Review 2 invoices</span></td></tr>
-          <tr><td>Net VAT Payable / Refundable</td><td class="mono">16,400</td><td><span class="b b-a">Draft</span></td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <div class="tab-body" id="acc-closing">
-    <div class="g2 mb16">
-      <div class="card">
-        <div class="card-hd"><div class="card-title">Monthly Closing Flow</div><button class="btn btn-p btn-sm" onclick="toast('June 2024 period locked','warn')">Lock Period</button></div>
-        <div class="tline-item"><div class="tline-dot" style="background:var(--green-bg);color:var(--green)">1</div><div><div>Review all transactions</div><div class="card-sub">Sales, purchases, expenses, payroll, inventory, receipts, payments</div></div></div>
-        <div class="tline-item"><div class="tline-dot" style="background:var(--amber-bg);color:var(--amber)">2</div><div><div>Check unposted drafts</div><div class="card-sub">4 entries need review</div></div></div>
-        <div class="tline-item"><div class="tline-dot" style="background:var(--accent-glow);color:var(--accent)">3</div><div><div>Reconcile banks and review VAT</div><div class="card-sub">Difference AED 500, VAT draft ready</div></div></div>
-        <div class="tline-item"><div class="tline-dot" style="background:var(--purple-bg);color:var(--purple)">4</div><div><div>Generate trial balance and lock period</div><div class="card-sub">Locked periods require reversal journals and admin reopen approval</div></div></div>
-      </div>
-      <div class="card">
-        <div class="card-hd"><div class="card-title">Closing Controls</div></div>
-        <div class="toggle-row"><div><div>Locked period cannot be edited</div><div class="toggle-copy">Only reversal entries allowed after lock.</div></div><input type="checkbox" checked></div>
-        <div class="toggle-row"><div><div>Admin approval to reopen period</div><div class="toggle-copy">Every reopen is logged with reason.</div></div><input type="checkbox" checked></div>
-        <div class="toggle-row"><div><div>Opening balances must balance</div><div class="toggle-copy">Assets equal liabilities plus equity.</div></div><input type="checkbox" checked></div>
-      </div>
     </div>
   </div>
 
@@ -2314,7 +2314,7 @@
   </div>
   <div class="tab-body on" id="pay-in">
     <div class="card">
-      <div class="card-hd"><div class="card-title">Customer Payments Received</div><button class="btn btn-p btn-sm" onclick="showM('m-payment')">+ Record Payment</button></div>
+      <div class="card-hd"><div class="card-title">Customer Payments Received</div><button class="btn btn-p btn-sm" onclick="openPaymentModal('Customer Receipt')">+ Record Payment</button></div>
       <table class="tbl">
         <thead><tr><th>Receipt No.</th><th>Customer</th><th>Invoice</th><th>Method</th><th>Date</th><th>Amount</th><th>Status</th></tr></thead>
         <tbody id="payment-in-tbody">
@@ -2326,7 +2326,7 @@
   </div>
   <div class="tab-body" id="pay-out">
     <div class="card">
-      <div class="card-hd"><div class="card-title">Supplier Payments Made</div><button class="btn btn-p btn-sm" onclick="showM('m-payment')">+ Pay Vendor</button></div>
+      <div class="card-hd"><div class="card-title">Supplier Payments Made</div><button class="btn btn-p btn-sm" onclick="openPaymentModal('Supplier Payment')">+ Pay Vendor</button></div>
       <table class="tbl">
         <thead><tr><th>Payment No.</th><th>Vendor</th><th>Bill</th><th>Method</th><th>Date</th><th>Amount</th><th>Status</th></tr></thead>
         <tbody id="payment-out-tbody">
@@ -4278,8 +4278,9 @@ period_locks ─&lt; audit_logs
 
 <div class="overlay" id="m-payment" onclick="closeOvBg(event,'m-payment')">
   <div class="modal"><div class="modal-title">Record Payment</div><div class="modal-sub">Record customer receipt or supplier payment</div>
-    <div class="fr2"><div class="fg"><label class="fl">Payment Type</label><select class="fi" id="payment-type"><option>Customer Receipt</option><option>Supplier Payment</option></select></div><div class="fg"><label class="fl">Reference</label><input class="fi mono" id="payment-ref" placeholder="RCT-2024-0113"></div></div>
-    <div class="fr2"><div class="fg"><label class="fl">Contact</label><input class="fi" id="payment-contact" placeholder="Customer or vendor"></div><div class="fg"><label class="fl">Amount (AED)</label><input class="fi mono" id="payment-amount" placeholder="0.00"></div></div>
+    <div class="fr2"><div class="fg"><label class="fl">Payment Type</label><select class="fi" id="payment-type" onchange="handlePaymentTypeChange()"><option>Customer Receipt</option><option>Supplier Payment</option></select></div><div class="fg"><label class="fl">Reference</label><input class="fi mono" id="payment-ref" placeholder="RCT-2024-0113"></div></div>
+    <div class="fr2"><div class="fg"><label class="fl" id="payment-contact-label">Customer / Vendor</label><input class="fi" id="payment-contact" list="payment-contact-options" placeholder="Select customer or vendor" onfocus="syncPaymentFormOptions()" oninput="applyPaymentContactSelection()" onchange="applyPaymentContactSelection()"><datalist id="payment-contact-options"></datalist></div><div class="fg"><label class="fl" id="payment-document-label">Invoice / Bill</label><input class="fi mono" id="payment-document" list="payment-document-options" placeholder="Select invoice or bill" onfocus="syncPaymentFormOptions()" oninput="applyPaymentDocumentSelection()" onchange="applyPaymentDocumentSelection()"><datalist id="payment-document-options"></datalist></div></div>
+    <div class="fg"><label class="fl">Amount (AED)</label><input class="fi mono" id="payment-amount" placeholder="0.00"></div>
     <div class="fr2"><div class="fg"><label class="fl">Method</label><select class="fi" id="payment-method"><option>Bank Transfer</option><option>Card</option><option>Cash</option><option>Gateway</option></select></div><div class="fg"><label class="fl">Date</label><input class="fi" id="payment-date" type="date"></div></div>
     <div class="modal-foot"><button class="btn btn-g" onclick="closeM('m-payment')">Cancel</button><button class="btn btn-p" onclick="savePayment()">Save Payment</button></div>
   </div>
@@ -4327,6 +4328,7 @@ period_locks ─&lt; audit_logs
     <div class="fg"><label class="fl">Account Holder Name</label><input class="fi" id="bank-holder"></div>
     <div class="fg"><label class="fl">IBAN</label><input class="fi mono" id="bank-iban" placeholder="AE..."></div>
     <div class="fr2"><div class="fg"><label class="fl">Account Type</label><select class="fi" id="bank-type"><option>Current</option><option>Savings</option></select></div><div class="fg"><label class="fl">Currency</label><select class="fi" id="bank-currency"><option>AED</option><option>USD</option><option>EUR</option><option>GBP</option></select></div></div>
+    <div class="fg"><label class="fl">Opening Balance</label><input class="fi mono" id="bank-balance" placeholder="0.00" inputmode="decimal"></div>
     <div class="fr2"><div class="fg"><label class="fl">Swift Code</label><input class="fi mono" id="bank-swift" placeholder="ENBD AEADxxx"></div><div class="fg"><label class="fl">Branch</label><input class="fi" id="bank-branch" placeholder="Branch name"></div></div>
     <div class="modal-foot"><button class="btn btn-g" onclick="closeM('m-bank')">Cancel</button><button class="btn btn-p" onclick="saveBankAccount()">Save Account</button></div>
   </div>
@@ -4388,30 +4390,30 @@ period_locks ─&lt; audit_logs
 
 <div class="overlay" id="m-shift" onclick="closeOvBg(event,'m-shift')">
   <div class="modal"><div class="modal-title">Add Shift</div><div class="modal-sub">Create rota shift timing and overtime rules</div>
-    <div class="fr2"><div class="fg"><label class="fl">Shift Name</label><input class="fi" value="Morning Shift"></div><div class="fg"><label class="fl">Shift Code</label><input class="fi mono" value="MOR"></div></div>
-    <div class="fr2"><div class="fg"><label class="fl">Start Time</label><input class="fi mono" type="time" value="09:00"></div><div class="fg"><label class="fl">End Time</label><input class="fi mono" type="time" value="18:00"></div></div>
-    <div class="fr3"><div class="fg"><label class="fl">Break Minutes</label><input class="fi mono" value="60"></div><div class="fg"><label class="fl">Grace Period</label><input class="fi mono" value="10 minutes"></div><div class="fg"><label class="fl">Overtime After</label><input class="fi mono" value="8 hours"></div></div>
-    <div class="fg"><label class="fl">Status</label><select class="fi"><option>Active</option><option>Inactive</option></select></div>
-    <div class="modal-foot"><button class="btn btn-g" onclick="closeM('m-shift')">Cancel</button><button class="btn btn-p" onclick="saveM('m-shift','Shift saved ✓')">Save Shift</button></div>
+    <div class="fr2"><div class="fg"><label class="fl">Shift Name</label><input class="fi" id="shift-name" placeholder="Morning Shift"></div><div class="fg"><label class="fl">Shift Code</label><input class="fi mono" id="shift-code" placeholder="MOR"></div></div>
+    <div class="fr2"><div class="fg"><label class="fl">Start Time</label><input class="fi mono" id="shift-start" type="time" value="09:00"></div><div class="fg"><label class="fl">End Time</label><input class="fi mono" id="shift-end" type="time" value="18:00"></div></div>
+    <div class="fr3"><div class="fg"><label class="fl">Break Minutes</label><input class="fi mono" id="shift-break" value="60"></div><div class="fg"><label class="fl">Grace Period</label><input class="fi mono" id="shift-grace" value="10 minutes"></div><div class="fg"><label class="fl">Overtime After</label><input class="fi mono" id="shift-ot-after" value="8 hours"></div></div>
+    <div class="fg"><label class="fl">Status</label><select class="fi" id="shift-status"><option>Active</option><option>Inactive</option></select></div>
+    <div class="modal-foot"><button class="btn btn-g" onclick="closeM('m-shift')">Cancel</button><button class="btn btn-p" onclick="saveShift()">Save Shift</button></div>
   </div>
 </div>
 
 <div class="overlay" id="m-shift-swap" onclick="closeOvBg(event,'m-shift-swap')">
   <div class="modal"><div class="modal-title">Shift Swap Request</div><div class="modal-sub">Request swap with another employee</div>
-    <div class="fg"><label class="fl">My Shift</label><select class="fi"><option>Mon Morning</option><option>Fri Overtime</option><option>Thu Evening</option></select></div>
-    <div class="fr2"><div class="fg"><label class="fl">Swap With</label><select class="fi"><option>Sara Al Mansouri</option><option>Rania Abboud</option><option>Mohamed Jaber</option></select></div><div class="fg"><label class="fl">Target Shift</label><select class="fi"><option>Tue Evening</option><option>Sat Morning</option><option>Wed Morning</option></select></div></div>
-    <div class="fg"><label class="fl">Reason</label><textarea class="fi" rows="3" placeholder="Explain why this swap is needed"></textarea></div>
-    <div class="modal-foot"><button class="btn btn-g" onclick="closeM('m-shift-swap')">Cancel</button><button class="btn btn-p" onclick="saveM('m-shift-swap','Shift swap request submitted ✓')">Submit Request</button></div>
+    <div class="fg"><label class="fl">My Shift</label><input class="fi" id="swap-my-shift" placeholder="Mon Morning"></div>
+    <div class="fr2"><div class="fg"><label class="fl">Swap With</label><input class="fi" id="swap-with" placeholder="Employee name"></div><div class="fg"><label class="fl">Target Shift</label><input class="fi" id="swap-target-shift" placeholder="Tue Evening"></div></div>
+    <div class="fg"><label class="fl">Reason</label><textarea class="fi" id="swap-reason" rows="3" placeholder="Explain why this swap is needed"></textarea></div>
+    <div class="modal-foot"><button class="btn btn-g" onclick="closeM('m-shift-swap')">Cancel</button><button class="btn btn-p" onclick="saveRotaSwap()">Submit Request</button></div>
   </div>
 </div>
 
 <div class="overlay" id="m-edit-shift" onclick="closeOvBg(event,'m-edit-shift')">
-  <div class="modal"><div class="modal-title">Edit Shift</div><div class="modal-sub">Ahmed Rashid · Monday, 04 May 2026</div>
-    <div class="fg"><label class="fl">Shift Type</label><select class="fi"><option>Morning</option><option>Evening</option><option>Night</option><option>Off</option><option>Leave</option><option>Overtime</option></select></div>
-    <div class="fr3"><div class="fg"><label class="fl">Start Time</label><input class="fi mono" type="time" value="09:00"></div><div class="fg"><label class="fl">End Time</label><input class="fi mono" type="time" value="18:00"></div><div class="fg"><label class="fl">Break Minutes</label><input class="fi mono" value="60"></div></div>
-    <div class="fg"><label class="fl">Mark As</label><select class="fi"><option>Shift</option><option>Off</option><option>Leave</option><option>OT</option><option>Holiday</option><option>Training</option></select></div>
-    <div class="fg"><label class="fl">Notes</label><textarea class="fi" rows="3" placeholder="Optional rota note"></textarea></div>
-    <div class="modal-foot"><button class="btn btn-danger" onclick="closeM('m-edit-shift');toast('Shift removed','warn')">Remove Shift</button><button class="btn btn-g" onclick="closeM('m-edit-shift')">Cancel</button><button class="btn btn-p" onclick="saveM('m-edit-shift','Shift updated ✓')">Save</button></div>
+  <div class="modal"><div class="modal-title">Edit Shift</div><div class="modal-sub" id="rota-edit-sub">Select a rota cell</div>
+    <div class="fg"><label class="fl">Shift Type</label><select class="fi" id="rota-edit-type" onchange="applyRotaEditTypeDefaults()"><option>Morning</option><option>Evening</option><option>Night</option><option>Off</option><option>Leave</option><option>Overtime</option></select></div>
+    <div class="fr3"><div class="fg"><label class="fl">Start Time</label><input class="fi mono" id="rota-edit-start" type="time" value="09:00"></div><div class="fg"><label class="fl">End Time</label><input class="fi mono" id="rota-edit-end" type="time" value="18:00"></div><div class="fg"><label class="fl">Break Minutes</label><input class="fi mono" id="rota-edit-break" value="60"></div></div>
+    <div class="fg"><label class="fl">Mark As</label><select class="fi" id="rota-edit-mark"><option>Shift</option><option>Off</option><option>Leave</option><option>OT</option><option>Holiday</option><option>Training</option></select></div>
+    <div class="fg"><label class="fl">Notes</label><textarea class="fi" id="rota-edit-notes" rows="3" placeholder="Optional rota note"></textarea></div>
+    <div class="modal-foot"><button class="btn btn-danger" onclick="removeRotaCellShift()">Remove Shift</button><button class="btn btn-g" onclick="closeM('m-edit-shift')">Cancel</button><button class="btn btn-p" onclick="saveRotaCellShift()">Save</button></div>
   </div>
 </div>
 
@@ -4475,6 +4477,15 @@ period_locks ─&lt; audit_logs
     <div class="fg"><label class="fl">Account Name</label><input class="fi" id="acc-name" placeholder="Account name"></div>
     <div class="fr2"><div class="fg"><label class="fl">Category</label><select class="fi" id="acc-category"><option>Current</option><option>Fixed</option><option>Direct</option><option>Indirect</option></select></div><div class="fg"><label class="fl">Parent Account</label><select class="fi" id="acc-parent"><option>None (Root)</option><option>Cash & Cash Equivalents (1000)</option><option>Accounts Receivable (1100)</option></select></div></div>
     <div class="modal-foot"><button class="btn btn-g" onclick="closeM('m-acc')">Cancel</button><button class="btn btn-p" onclick="saveAccount()">Add Account</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="m-add-choice" onclick="closeOvBg(event,'m-add-choice')">
+  <div class="modal" style="width:620px">
+    <div class="modal-title" id="add-choice-title">Add New</div>
+    <div class="modal-sub" id="add-choice-sub">Choose what you want to create</div>
+    <div class="g2 mb16" id="add-choice-options"></div>
+    <div class="modal-foot"><button class="btn btn-g" onclick="closeM('m-add-choice')">Cancel</button></div>
   </div>
 </div>
 

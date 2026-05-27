@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
@@ -28,6 +29,23 @@ def create_account(
     db.commit()
     db.refresh(account)
     return account
+
+
+@router.delete("/accounts/{account_id}", status_code=204)
+def delete_account(
+    account_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> None:
+    account = db.query(Account).filter(Account.company_id == current_user.company_id, Account.id == account_id).first()
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+    used = db.query(func.count(JournalLine.id)).filter(JournalLine.account_id == account.id).scalar() or 0
+    if used:
+        raise HTTPException(status_code=409, detail="Account is used by journal lines")
+    db.delete(account)
+    db.commit()
+    return None
 
 
 @router.get("/journal", response_model=list[JournalOut])

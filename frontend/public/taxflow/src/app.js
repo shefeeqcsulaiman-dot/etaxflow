@@ -1,16 +1,16 @@
 const META={dashboard:{t:'Dashboard',s:'Loading dashboard from database',a:'',ao:null},company:{t:'Company Registration',s:'UAE Trade License & FTA Details',a:'Save All',ao:()=>toast('All changes saved','ok')},sales:{t:'Sales & Invoices',s:'Upload - AI Extraction - Validation - Invoices',a:'+ New Invoice',ao:()=>{go('sales');setTimeout(()=>stab(document.querySelectorAll('#page-sales .tab')[4],'s-create'),50)}},purchase:{t:'Purchases',s:'Upload - AI Extraction - Validation',a:'Upload Files',ao:()=>document.getElementById('pur-file').click()},bank:{t:'Bank Accounts',s:'Accounts - Transactions - Reconciliation',a:'+ Add Account',ao:()=>showM('m-bank')},inventory:{t:'Inventory',s:'Stock - Items - Movements',a:'+ Add Item',ao:()=>openInventoryItemModal()},expense:{t:'Expenses',s:'List - Create - Approvals',a:'+ New Expense',ao:()=>{go('expense');setTimeout(()=>stab(document.querySelectorAll('#page-expense .tab')[1],'exp-create'),50)}},accounting:{t:'Accounting',s:'Chart - Journal - Ledger',a:'+ New Entry',ao:()=>showM('m-acc')},reports:{t:'Reports',s:'VAT - P&L - Trial Balance',a:'Export PDF',ao:()=>toast('Exporting report...','info')},settings:{t:'Settings',s:'General - Users - Tax',a:'Save All',ao:()=>toast('Settings saved','ok')},staff:{t:'Staff Management',s:'Attendance - Leave - Corrections - Biometric',a:'+ Add Employee',ao:()=>showM('m-emp')},expert:{t:'Expert Review',s:'Find CA experts - Submit for review',a:'+ New Request',ao:()=>showM('m-newreview')},design:{t:'System Design',s:'Functional Spec - Fields - Validations - API',a:'Export Spec',ao:()=>toast('Exporting FRD to PDF...','info')}};
 META.settings={t:'Settings',s:'Company - Users - Tax - Security - Integrations - Invoice Design',a:'Save All',ao:()=>toast('Settings saved','ok')};
 META.payroll={t:'Payroll',s:'Salary run - WPS/SIF - Payslips - Posting',a:'Run Payroll',ao:()=>{go('payroll');setTimeout(()=>runPayroll(),50)}};
-META.sales={t:'Sales & Invoices',s:'Upload - AI Extraction - Validation - Invoices',a:'+ New Invoice',ao:()=>{go('sales');setTimeout(()=>stab(document.querySelectorAll('#page-sales .tab')[4],'s-create'),50)}};
+META.sales={t:'Sales & Invoices',s:'Upload - AI Extraction - Validation - Invoices',a:'+ New',ao:()=>openSalesAddChoice()};
 META.quotations={t:'Quotations',s:'Create - share - convert to invoice',a:'+ New Quotation',ao:()=>{go('quotations');setTimeout(()=>stab(document.querySelectorAll('#page-quotations .tab')[1],'q-create'),50)}};
 META.purchase={t:'Purchases',s:'Upload - AI Extraction - Validation - Manual - Settings',a:'Upload Files',ao:()=>document.getElementById('pur-file').click()};
 META.ai={t:'AI Assistant',s:'Ask questions about TaxFlow modules and workflows',a:'Ask AI',ao:()=>askSystemAI()};
 META.bills={t:'Bills',s:'Vendor bills - Purchase orders - Supplier payments',a:'+ New Bill',ao:()=>showM('m-bill')};
-META.payments={t:'Payments',s:'Receipts - Payouts - Gateway settlements',a:'+ Record Payment',ao:()=>showM('m-payment')};
+META.payments={t:'Payments',s:'Receipts - Payouts - Gateway settlements',a:'+ Record Payment',ao:()=>openPaymentModal('Customer Receipt')};
 META.documents={t:'Documents',s:'Receipts - PDFs - Audit files - Attachments',a:'Upload Document',ao:()=>toast('Choose files to upload...','info')};
 META.notifications={t:'Notifications',s:'Email - WhatsApp - SMS - Push - In-app alerts',a:'+ New Rule',ao:()=>toast('Notification rule builder opened','info')};
 META.rota={t:'Rota Planning',s:'Shift setup - Weekly rota - Coverage - Swap requests',a:'Publish Rota',ao:()=>publishRota()};
-META.accounting={t:'Accounting',s:'Chart - Journal - Ledger - Tax - Closing',a:'+ Journal Entry',ao:()=>{go('accounting');setTimeout(()=>stab(document.querySelectorAll('#page-accounting .tab')[1],'acc-journal'),50)}};
+META.accounting={t:'Accounting',s:'Chart - Vouchers - Ledger - Filing - Bank Recon',a:'+ Voucher',ao:()=>{go('accounting');setTimeout(()=>stab(document.querySelectorAll('#page-accounting .tab')[1],'acc-voucher'),50)}};
 META.corporate={t:'Corporate Accounting',s:'Corporate tax - Assets - Accruals - Cost centers - Budgets',a:'Tax Report',ao:()=>{go('corporate');setTimeout(()=>stab(document.querySelectorAll('#page-corporate .tab')[0],'corp-tax'),50)}};
 META.reports={t:'Reports',s:'VAT - P&L - Balance Sheet - Trial Balance',a:'Export PDF',ao:()=>exportActiveReportPdf()};
 META.exception={t:'Exception Center',s:'Failed postings - duplicates - VAT/OCR - stock and payroll issues',a:'Refresh',ao:()=>loadExceptionCenter()};
@@ -51,6 +51,10 @@ function runPageWarmup(page){
     bindDetailViews();
     bindEditActions();
     bindGenericAddActions();
+    if(page==='rota'){
+      seedDefaultRotaShifts();
+      updateRotaStats();
+    }
   },500);
 }
 
@@ -145,7 +149,10 @@ function go(page){
   closeSidebar();
   if(page==='reports')syncReportsFromDatabase();
   if(page==='exception')loadExceptionCenter();
-  if(page==='inventory')ensurePurchaseRecordsLoadedForStock();
+  if(page==='inventory'){
+    ensurePurchaseRecordsLoadedForStock();
+    setTimeout(()=>ensureInventoryBulkSelection(),80);
+  }
   if(page==='accounting')loadAccountingFromDb();
   runPageWarmup(page);
   updateBackButton();
@@ -164,8 +171,9 @@ function stab(el,target){
   if(t)t.classList.add('on');
   if(target==='inv-mapping')loadStockMappingsFromServer();
   if(target==='inv-stock')ensurePurchaseRecordsLoadedForStock();
+  if(String(target||'').startsWith('inv-'))setTimeout(()=>ensureInventoryBulkSelection(),80);
   if(target==='p-records')ensurePurchaseRecordsLoaded();
-  if(target==='acc-journal')prepareJournalForm();
+  if(target==='acc-voucher')prepareJournalForm();
   if(target==='acc-ledger')loadAccountingFromDb();
   if(target==='p-manual'){
     bindManualPurchaseCalculator();
@@ -204,6 +212,7 @@ function showM(id){
   modal.classList.add('on');
   if(id==='m-user')applyUserRolePermissions();
   if(id==='m-emp'&&!document.getElementById('emp-id')?.value)setFieldValue(document.getElementById('emp-id'),nextEmployeeId());
+  if(id==='m-payment')setTimeout(()=>syncPaymentFormOptions(),0);
   setTimeout(()=>modal.querySelector('input,select,textarea,button:not(.modal-x)')?.focus(),30);
 }
 
@@ -608,7 +617,7 @@ function saveStockMap(){
   const unitsOuter=parseAmount(document.getElementById('stock-map-units-outer')?.value)||1;
   const pricing=updateStockMapPricing();
   if(!product||!generated){
-    toast('Enter Product Name and Generated Name','warn');
+    toast('Enter Display Name and TaxFlow Name','warn');
     return;
   }
   if(!currentStockMapRow){
@@ -682,6 +691,7 @@ function saveStockMap(){
   audit('Mapped stock product',product,'Saved');
   refreshInvoiceProductSuggestions();
   refreshQuotationProductOptions();
+  ensureInventoryBulkSelection();
   refreshEnhancedTable(document.getElementById('stock-map-tbody')?.closest('table'));
 }
 
@@ -744,6 +754,25 @@ function generateStockMapName(value){
     .trim();
 }
 
+function titleCaseStockName(value){
+  return String(value||'').toLowerCase().replace(/\b[a-z0-9]/g,char=>char.toUpperCase());
+}
+
+function stockMapDisplayNameSuggestions(value){
+  const raw=String(value||'')
+    .replace(/[_-]+/g,' ')
+    .replace(/\b(sku|item|code|prod|product)\b[:\s-]*/gi,'')
+    .replace(/\s+/g,' ')
+    .trim();
+  const normalized=generateStockMapName(raw);
+  return [...new Set([
+    normalized,
+    titleCaseStockName(normalized),
+    normalized.replace(/\bvat\b/gi,'VAT'),
+    normalized.replace(/\buae\b/gi,'UAE')
+  ].map(item=>item.trim()).filter(Boolean))];
+}
+
 function generateStockSku(value){
   const base=String(value||'ITEM').toUpperCase().replace(/[^A-Z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,18)||'ITEM';
   const existing=new Set([...document.querySelectorAll('#stock-map-tbody tr:not([data-empty-state]),#prod-tbody tr:not([data-empty-state])')]
@@ -757,12 +786,28 @@ function generateStockSku(value){
 function generateStockMapField(){
   const product=document.getElementById('stock-map-product');
   const generated=document.getElementById('stock-map-generated');
-  if(!product?.value.trim()){
-    toast('Enter Product Name first','warn');
+  const source=(
+    generated?.value||
+    product?.value||
+    currentStockMapRow?.children?.[2]?.textContent||
+    currentStockMapRow?.children?.[0]?.textContent||
+    currentStockMapRow?.dataset?.stockSku||
+    ''
+  ).trim();
+  if(!source){
+    toast('Select a mapping or enter TaxFlow Name first','warn');
     return;
   }
-  if(generated)generated.value=generateStockMapName(product.value);
-  toast('Generated name updated','info');
+  const suggestions=stockMapDisplayNameSuggestions(source);
+  if(!suggestions.length){
+    toast('No name suggestion available','warn');
+    return;
+  }
+  const current=(product?.value||'').trim();
+  const currentIndex=suggestions.findIndex(item=>item.toLowerCase()===current.toLowerCase());
+  const next=suggestions[(currentIndex+1)%suggestions.length]||suggestions[0];
+  if(product)product.value=next;
+  toast('Display name suggested','info');
 }
 
 function stockMapActionsHtml(){
@@ -774,7 +819,8 @@ function stockMapActionsHtml(){
 
 function deleteStockMapRow(btn){
   const row=btn.closest('tr');
-  const name=row?.children[0]?.textContent.trim()||'mapping';
+  if(deleteInventoryMappingRow(row))return;
+  const name=inventoryRowCellText(row,0)||'mapping';
   const mappingId=row?.dataset.mappingId;
   if(mappingId){
     moduleApi(`/inventory/mappings/${encodeURIComponent(mappingId)}`,{method:'DELETE'})
@@ -792,6 +838,266 @@ function deleteStockMapRow(btn){
   refreshEnhancedTable(document.getElementById('stock-map-tbody')?.closest('table'));
   toast(`${name} mapping removed`,'warn');
   audit('Deleted stock mapping',name,'Deleted');
+}
+
+function inventoryBulkCellHtml(tbodyId,label='row'){
+  return `<input type="checkbox" class="inventory-bulk-select" aria-label="Select ${escapeHtml(label)}" data-inventory-tbody="${escapeHtml(tbodyId)}">`;
+}
+
+function ensureInventoryBulkSelection(scope=document){
+  ['stock-level-tbody','prod-tbody','stock-map-tbody'].forEach(tbodyId=>{
+    const tbody=(scope.getElementById?scope:document).getElementById?.(tbodyId)||document.getElementById(tbodyId);
+    const table=tbody?.closest('table');
+    if(!tbody||!table)return;
+    const headRow=table.tHead?.rows?.[0];
+    if(headRow&&!headRow.querySelector('th[data-inventory-bulk-col]')){
+      const th=document.createElement('th');
+      th.dataset.inventoryBulkCol='1';
+      th.style.width='42px';
+      th.innerHTML=`<input type="checkbox" aria-label="Select all inventory rows" onchange="toggleInventoryBulkSelection('${tbodyId}',this.checked)">`;
+      headRow.insertBefore(th,headRow.firstChild);
+    }
+    [...tbody.rows].forEach(row=>{
+      if(row.dataset.emptyState==='1'||row.querySelector('td[colspan]'))return;
+      if(row.querySelector('td[data-inventory-bulk-col]'))return;
+      const td=document.createElement('td');
+      td.dataset.inventoryBulkCol='1';
+      td.innerHTML=inventoryBulkCellHtml(tbodyId,rowFirstValue(row));
+      row.insertBefore(td,row.firstChild);
+    });
+  });
+}
+
+function toggleInventoryBulkSelection(tbodyId,checked){
+  document.querySelectorAll(`#${tbodyId} .inventory-bulk-select`).forEach(box=>{
+    box.checked=checked;
+  });
+}
+
+function selectedInventoryRows(tbodyId){
+  ensureInventoryBulkSelection();
+  return [...document.querySelectorAll(`#${tbodyId} tr:not([data-empty-state])`)]
+    .filter(row=>row.querySelector('.inventory-bulk-select')?.checked);
+}
+
+async function inventoryBulkDeleteSelected(tbodyId){
+  const rows=selectedInventoryRows(tbodyId);
+  if(!rows.length){
+    toast('Select inventory rows to delete','warn');
+    return;
+  }
+  if(tbodyId==='stock-movement-tbody'){
+    toast('Stock movements are source history. Use Clear Table to remove inventory history.','warn');
+    return;
+  }
+  if(!window.confirm(`Delete ${rows.length} selected inventory row(s)?`))return;
+  let deleted=0;
+  let failed=0;
+  for(const row of rows){
+    const ok=await deleteInventoryRow(row,{skipConfirm:true,bulk:true});
+    if(ok)deleted++;
+    else failed++;
+  }
+  ensureInventoryBulkSelection();
+  toast(`${deleted} deleted${failed?`, ${failed} failed`:''}`,'warn');
+}
+
+async function deleteInventoryRow(row,{skipConfirm=false,bulk=false,button=null}={}){
+  const table=row?.closest('table');
+  const tbodyId=table?.tBodies?.[0]?.id||'';
+  if(tbodyId==='stock-level-tbody'){
+    const code=inventoryRowCellText(row,0);
+    const name=inventoryRowCellText(row,1);
+    const productRow=matchingInventoryProductRow(code,name);
+    if(row.dataset.stockSource==='purchase'&&!productRow){
+      toast('This stock row is generated from purchase records. Use Clear Table to remove generated stock history.','warn');
+      return false;
+    }
+    return deleteInventoryProductAndMapping({
+      productRow,
+      mappingRow:matchingInventoryMappingRow(code,name),
+      stockRow:row,
+      button,
+      label:name||code,
+      skipConfirm,
+      quiet:bulk
+    });
+  }
+  if(tbodyId==='prod-tbody'){
+    const code=inventoryRowCellText(row,0);
+    const name=inventoryRowCellText(row,1);
+    return deleteInventoryProductAndMapping({
+      productRow:row,
+      mappingRow:matchingInventoryMappingRow(code,name),
+      stockRow:matchingStockLevelRow(code,name),
+      button,
+      label:name||code,
+      skipConfirm,
+      quiet:bulk
+    });
+  }
+  if(tbodyId==='stock-map-tbody'){
+    return deleteInventoryMappingRow(row,{skipConfirm:true,quiet:bulk});
+  }
+  return false;
+}
+
+function inventoryRowCellText(row,dataIndex){
+  const cells=[...row.children].filter(cell=>cell.dataset.inventoryBulkCol!=='1');
+  return cells[dataIndex]?.textContent.trim()||'';
+}
+
+function inventoryProductRecordFromRow(row){
+  if(!row)return {};
+  return {
+    id:inventoryRowCellText(row,0),
+    code:inventoryRowCellText(row,0),
+    name:inventoryRowCellText(row,1),
+    type:inventoryRowCellText(row,2),
+    category:inventoryRowCellText(row,3),
+    unit:inventoryRowCellText(row,4),
+    default_warehouse:inventoryRowCellText(row,5),
+    tracking:inventoryRowCellText(row,6),
+    vat:inventoryRowCellText(row,7),
+    status:inventoryRowCellText(row,8)
+  };
+}
+
+async function deleteInventoryMappingRow(row,{quiet=false}={}){
+  if(!row)return false;
+  const name=inventoryRowCellText(row,0)||'mapping';
+  const mappingId=row.dataset.mappingId;
+  try{
+    if(mappingId)await moduleApi(`/inventory/mappings/${encodeURIComponent(mappingId)}`,{method:'DELETE'});
+    row.remove();
+    const tbody=document.getElementById('stock-map-tbody');
+    if(tbody&&tbody.querySelectorAll('tr:not([data-empty-state])').length===0){
+      emptyTableMessage(tbody,'No stock mappings in database yet.');
+    }
+    const table=tbody?.closest('table');
+    if(table)refreshEnhancedTable(table);
+    if(!quiet)toast(`${name} mapping removed`,'warn');
+    audit('Deleted stock mapping',name,'Deleted');
+    return true;
+  }catch(err){
+    console.warn('Stock mapping delete failed:',err);
+    if(!quiet)toast('Could not delete stock mapping from database','warn');
+    return false;
+  }
+}
+
+async function deleteInventoryProductAndMapping({productRow=null,mappingRow=null,stockRow=null,button=null,label='inventory item',skipConfirm=false,quiet=false}={}){
+  const productCode=inventoryRowCellText(productRow,0)||inventoryRowCellText(stockRow,0)||mappingRow?.dataset?.itemCode||mappingRow?.dataset?.stockSku||'';
+  const productName=inventoryRowCellText(productRow,1)||inventoryRowCellText(stockRow,1)||inventoryRowCellText(mappingRow,0)||label;
+  if(!productRow&&!mappingRow){
+    toast('This stock row is generated from purchases. Use Clear Table to remove generated stock history.','warn');
+    return false;
+  }
+  if(productName&&tableHasText('#sales-invoice-tbody',productName)){
+    toast(`Cannot delete ${productName}: linked sales invoices exist`,'warn');
+    return false;
+  }
+  if(productName&&tableHasText('#sales-return-tbody',productName)){
+    toast(`Cannot delete ${productName}: linked sales returns exist`,'warn');
+    return false;
+  }
+  if(!skipConfirm&&!window.confirm(`Delete ${productName || productCode || 'this inventory item'} from inventory? This removes the Item Master row and its stock mapping when present.`))return false;
+  if(button)button.disabled=true;
+  try{
+    const mappingId=mappingRow?.dataset?.mappingId;
+    if(mappingId)await moduleApi(`/inventory/mappings/${encodeURIComponent(mappingId)}`,{method:'DELETE'});
+    if(productRow){
+      const record=inventoryProductRecordFromRow(productRow);
+      await deleteServer('products',record,{throwOnError:true});
+    }
+    productRow?.remove();
+    mappingRow?.remove();
+    stockRow?.remove();
+    ['prod-tbody','stock-map-tbody','stock-level-tbody'].forEach(id=>{
+      const tbody=document.getElementById(id);
+      if(tbody&&tbody.querySelectorAll('tr:not([data-empty-state])').length===0){
+        emptyTableMessage(tbody,id==='prod-tbody'?'No products in database yet.':id==='stock-map-tbody'?'No stock mappings in database yet.':'No stock items in database yet.');
+      }
+      const table=tbody?.closest('table');
+      if(table)refreshEnhancedTable(table);
+    });
+    syncStockLevelsFromProducts();
+    syncInventoryItemOptions();
+    refreshInvoiceProductSuggestions();
+    refreshPurchaseProductSuggestions();
+    refreshQuotationProductOptions();
+    if(!quiet)toast(`${productName || productCode || 'Inventory item'} deleted`,'warn');
+    audit('Deleted inventory item',productName||productCode,'Deleted');
+    return true;
+  }catch(err){
+    console.warn('Inventory delete failed:',err);
+    if(!quiet)toast('Could not delete inventory item from database','warn');
+    return false;
+  }finally{
+    if(button)button.disabled=false;
+  }
+}
+
+function matchingInventoryProductRow(code,name){
+  const codeKey=String(code||'').trim().toLowerCase();
+  const nameKey=String(name||'').trim().toLowerCase();
+  const rows=[...document.querySelectorAll('#prod-tbody tr:not([data-empty-state])')];
+  if(codeKey){
+    return rows.find(row=>inventoryRowCellText(row,0).toLowerCase()===codeKey)||null;
+  }
+  if(!nameKey)return null;
+  const matches=rows.filter(row=>{
+    const rowCode=inventoryRowCellText(row,0).toLowerCase();
+    const rowName=inventoryRowCellText(row,1).toLowerCase();
+    return !rowCode&&rowName===nameKey;
+  });
+  return matches.length===1?matches[0]:null;
+}
+
+function matchingInventoryMappingRow(code,name){
+  const codeKey=String(code||'').trim().toLowerCase();
+  const nameKey=String(name||'').trim().toLowerCase();
+  const rows=[...document.querySelectorAll('#stock-map-tbody tr:not([data-empty-state])')];
+  if(codeKey){
+    return rows.find(row=>String(row.dataset.stockSku||row.dataset.itemCode||'').trim().toLowerCase()===codeKey)||null;
+  }
+  if(!nameKey)return null;
+  const matches=rows.filter(row=>{
+    const sku=String(row.dataset.stockSku||row.dataset.itemCode||'').trim().toLowerCase();
+    const display=inventoryRowCellText(row,0).toLowerCase();
+    const mapped=inventoryRowCellText(row,2).toLowerCase();
+    return !sku&&(display===nameKey||mapped===nameKey);
+  });
+  return matches.length===1?matches[0]:null;
+}
+
+function handleInventoryDelete(btn,row,table){
+  const tbodyId=table?.tBodies?.[0]?.id||'';
+  if(tbodyId==='stock-movement-tbody'){
+    toast('Stock movements are source history. Use Clear Table to remove inventory history.','warn');
+    return true;
+  }
+  if(['stock-level-tbody','prod-tbody','stock-map-tbody'].includes(tbodyId)){
+    deleteInventoryRow(row,{button:btn});
+    return true;
+  }
+  return false;
+}
+
+function matchingStockLevelRow(code,name){
+  const codeKey=String(code||'').trim().toLowerCase();
+  const nameKey=String(name||'').trim().toLowerCase();
+  const rows=[...document.querySelectorAll('#stock-level-tbody tr:not([data-empty-state])')];
+  if(codeKey){
+    return rows.find(row=>inventoryRowCellText(row,0).toLowerCase()===codeKey)||null;
+  }
+  if(!nameKey)return null;
+  const matches=rows.filter(row=>{
+    const rowCode=inventoryRowCellText(row,0).toLowerCase();
+    const rowName=inventoryRowCellText(row,1).toLowerCase();
+    return !rowCode&&rowName===nameKey;
+  });
+  return matches.length===1?matches[0]:null;
 }
 
 function stockSupplierNameFromItem(row){
@@ -854,12 +1160,17 @@ function stockMappingPayloadFromRow(row){
 async function loadStockMappingsFromServer(){
   const tbody=document.getElementById('stock-map-tbody');
   if(!tbody)return;
+  if(isInventoryTableCleared()){
+    emptyTableMessage(tbody,'No stock mappings in database yet.');
+    return;
+  }
   try{
     await ensureBackendSession();
     const mappings=await moduleApi('/inventory/mappings');
     tbody.innerHTML='';
     (mappings||[]).forEach(renderStockMappingRecord);
     syncStockMappingFromItems();
+    ensureInventoryBulkSelection();
   }catch(err){
     console.warn('Stock mappings unavailable:',err);
     syncStockMappingFromItems();
@@ -869,6 +1180,11 @@ async function loadStockMappingsFromServer(){
 function syncStockMappingFromItems(){
   const tbody=document.getElementById('stock-map-tbody');
   if(!tbody)return;
+  if(isInventoryTableCleared()){
+    emptyTableMessage(tbody,'No stock mappings in database yet.');
+    refreshInvoiceProductSuggestions();
+    return;
+  }
   removeEmptyState(tbody);
   const existing=new Set([...tbody.querySelectorAll('tr:not([data-empty-state])')]
     .map(row=>(row.dataset.stockSku||row.children[0]?.textContent.trim()||'').toLowerCase()));
@@ -897,6 +1213,7 @@ function syncStockMappingFromItems(){
   });
   refreshEnhancedTable(tbody.closest('table'));
   refreshInvoiceProductSuggestions();
+  ensureInventoryBulkSelection();
 }
 
 function syncInventoryItemOptions(){
@@ -1005,6 +1322,8 @@ function chkSettingsTRN(inp){
 const uploadedFiles = []; // {name, size, type, base64, category, period, status}
 const purchaseDocumentIds = new Set();
 const PURCHASE_AI_PREVIEW_LIMIT = 500;
+let currentSalesTransactionType = 'sale';
+let currentPurchaseTransactionType = 'purchase';
 
 const APP_CONFIG={
   apiEndpoint:null,
@@ -1787,7 +2106,7 @@ function renderDatabaseDashboardSummary(data){
     {label:'Vendors',count:counts.vendor_count,page:'purchase',tab:'p-vendors',icon:'VEN',tone:'green',group:'Operations',copy:'Supplier and vendor master'},
     {label:'Payments',count:counts.payment_count,page:'payments',icon:'PAY',tone:'accent',group:'Cash',copy:'Receipts and supplier payments'},
     {label:'Accounts',count:counts.account_count,page:'accounting',tab:'acc-chart',icon:'COA',tone:'teal',group:'Finance',copy:'Chart of accounts'},
-    {label:'Journals',count:counts.journal_count,page:'accounting',tab:'acc-journal',icon:'JE',tone:'purple',group:'Finance',copy:'Journal entries and ledger'},
+    {label:'Vouchers',count:counts.journal_count,page:'accounting',tab:'acc-voucher',icon:'JV',tone:'purple',group:'Finance',copy:'Voucher entries and ledger'},
     {label:'Source Transactions',count:counts.source_transaction_count,page:'purchase',tab:'p-records',icon:'SRC',tone:'amber',group:'Finance',copy:'Sales, purchase, and payment sources'},
     {label:'Tax Codes',count:counts.tax_code_count,page:'settings',tab:'set-tax',icon:'VAT',tone:'green',group:'Compliance',copy:'VAT setup and tax rules'},
     {label:'Tax Lines',count:counts.tax_line_count,page:'reports',tab:'rep-vat',icon:'TAX',tone:'red',group:'Compliance',copy:'VAT report lines'},
@@ -2088,6 +2407,7 @@ function removeEmptyState(tbody){
 function clearStaticDemoData(){
   const emptyTables={
     'sales-invoice-tbody':'No sales invoices in database yet.',
+    'sales-return-tbody':'No sales returns in database yet.',
     'customer-tbody':'No customers in database yet.',
     'quotation-tbody':'No quotations in database yet.',
     'purchase-record-tbody':'No purchase records in database yet.',
@@ -2096,6 +2416,12 @@ function clearStaticDemoData(){
     'payment-in-tbody':'No receipts in database yet.',
     'payment-out-tbody':'No payments in database yet.',
     'bank-account-tbody':'No bank accounts in database yet.',
+    'bank-transaction-tbody':'No bank transactions in database yet.',
+    'stock-level-tbody':'No stock items in database yet.',
+    'stock-movement-tbody':'No stock movements in database yet.',
+    'rota-shift-tbody':'No shifts in database yet.',
+    'rota-swap-tbody':'No shift swap requests in database yet.',
+    'rota-approval-tbody':'No rota approvals in database yet.',
     'expense-tbody':'No expenses in database yet.',
     'expense-approval-tbody':'No pending expenses for approval.',
     'prod-tbody':'No products in database yet.',
@@ -2147,6 +2473,9 @@ function clearDemoCardsAndCounters(){
   });
 }
 
+const financePaymentsByRef=new Map();
+const financeBankAccountsByKey=new Map();
+
 function resetDraftEntryDefaults(){
   setFieldValue(document.getElementById('inv-no'),'');
   setFieldValue(document.getElementById('quote-no'),'');
@@ -2155,6 +2484,11 @@ function resetDraftEntryDefaults(){
       row.remove();
       return;
     }
+    Object.keys(row.dataset).forEach(key=>{
+      if(['productCode','productName','priceSource','priceSnapshot','sourcePrice','mappingId','mapped','taxRate','mappingCost','markupPercent'].includes(key)){
+        delete row.dataset[key];
+      }
+    });
     setFieldValue(row.querySelector('.inv-product'),'');
     setFieldValue(row.querySelector('.inv-unit'),'PCS');
     setFieldValue(row.querySelector('.inv-qty'),'1');
@@ -2238,7 +2572,11 @@ function renderQuotationRecord(quote){
 }
 
 function hasFirstCellValue(tbody,value){
-  return !!tbody&&[...tbody.querySelectorAll('tr:not([data-empty-state]) td:first-child')].some(td=>td.textContent.trim().toLowerCase()===String(value||'').trim().toLowerCase());
+  const target=String(value||'').trim().toLowerCase();
+  return !!tbody&&[...tbody.querySelectorAll('tr:not([data-empty-state])')].some(row=>{
+    const first=[...row.children].find(cell=>cell.dataset.inventoryBulkCol!=='1');
+    return first?.textContent.trim().toLowerCase()===target;
+  });
 }
 
 function renderCustomerRecord(customer){
@@ -2309,6 +2647,7 @@ function applyQuotationCustomerSelection(){
 
 function renderProductRecord(product,options={}){
   const tbody=document.getElementById('prod-tbody');
+  if(isInventoryTableCleared())return;
   if(!tbody||!product?.name||hasFirstCellValue(tbody,product.code))return;
   const vatText=String(product.vat||'').includes('0')&&!String(product.vat||'').includes('5')?'0% Zero':String(product.vat||'').includes('Exempt')?'Exempt':'5%';
   const vatClass=vatText==='5%'?'b-b':'b-t';
@@ -2324,6 +2663,7 @@ function renderProductRecord(product,options={}){
   row.innerHTML=`<td class="mono">${escapeHtml(product.code||'PRD')}</td><td>${escapeHtml(product.name)}</td><td>Stock Item</td><td>${escapeHtml(product.category||'Materials')}</td><td>${escapeHtml(product.unit||'Each')}</td><td>Main Store</td><td><span class="b b-g">Yes</span></td><td><span class="b ${vatClass}">${escapeHtml(vatText)}</span></td><td><span class="b b-g">Active</span></td>`;
   removeEmptyState(tbody);
   tbody.prepend(row);
+  ensureInventoryBulkSelection();
   if(!options.deferRefresh&&!isHydratingFromServer)refreshEnhancedTable(tbody.closest('table'));
   if(!options.deferStockSync&&!isHydratingFromServer)syncStockLevelsFromProducts();
   if(!options.deferMappingSync&&!isHydratingFromServer)syncStockMappingFromItems();
@@ -2366,6 +2706,7 @@ function syncStockLevelsFromProducts(){
     return;
   }
   products.forEach(item=>tbody.appendChild(renderStockLevelRow(item)));
+  ensureInventoryBulkSelection();
   refreshEnhancedTable(tbody.closest('table'));
   updateStockLevelStats(products);
   loadStockLevelsFromServer();
@@ -2417,6 +2758,7 @@ async function loadStockLevelsFromServer(){
     setInventoryTableCleared(false);
     tbody.innerHTML='';
     products.forEach(item=>tbody.appendChild(renderStockLevelRow(item)));
+    ensureInventoryBulkSelection();
     refreshEnhancedTable(tbody.closest('table'));
     updateStockLevelStats(products);
   }catch(err){
@@ -2446,16 +2788,16 @@ async function clearInventoryTable(){
 }
 
 function productStockLevelFromRow(row){
-  const cells=row.children;
   const available=Number(row.dataset.available||0);
   const reorderLevel=Number(row.dataset.reorderLevel||0);
   return {
-    code:cells[0]?.textContent.trim()||'',
-    name:cells[1]?.textContent.trim()||'',
-    category:cells[3]?.textContent.trim()||'Uncategorized',
+    code:inventoryRowCellText(row,0)||'',
+    name:inventoryRowCellText(row,1)||'',
+    category:inventoryRowCellText(row,3)||'Uncategorized',
     available,
-    unit:cells[4]?.textContent.trim()||'Each',
-    reorderLevel
+    unit:inventoryRowCellText(row,4)||'Each',
+    reorderLevel,
+    source:'product'
   };
 }
 
@@ -2465,6 +2807,7 @@ function purchaseStockItems(){
     ? [...purchaseRecordCache.values()]
     : [...document.querySelectorAll('#purchase-record-tbody tr:not([data-empty-state])')].map(purchaseRecordFromRow);
   sourceRecords.forEach(record=>{
+    const stockSign=String(record?.source||record?.status||record?.document_type||'').toLowerCase().includes('return')?-1:1;
     const lines=Array.isArray(record?.lines)?record.lines:[];
     if(!lines.length&&Number(record?.items||0)>0){
       const name=record.supplier?`${record.supplier} purchase items`:'Unmapped purchase items';
@@ -2476,9 +2819,10 @@ function purchaseStockItems(){
         category:'Purchases',
         available:0,
         unit:'ITEM',
-        reorderLevel:0
+        reorderLevel:0,
+        source:'purchase'
       };
-      existing.available+=Number(record.items||0);
+      existing.available+=stockSign*Number(record.items||0);
       items.set(key,existing);
     }
     lines.forEach(line=>{
@@ -2494,9 +2838,10 @@ function purchaseStockItems(){
         category:line.category||'Purchases',
         available:0,
         unit:line.unit||line.unit_of_measure||line.uom||'PCS',
-        reorderLevel:0
+        reorderLevel:0,
+        source:'purchase'
       };
-      existing.available+=quantity;
+      existing.available+=stockSign*quantity;
       if(!existing.code&&code)existing.code=code;
       if(!existing.name&&name)existing.name=name;
       items.set(key,existing);
@@ -2552,6 +2897,7 @@ function renderStockLevelRow(item){
   const status=item.available<=0?'Out':item.reorderLevel&&item.available<=item.reorderLevel?'Low':'OK';
   const cls=status==='Out'?'b-r':status==='Low'?'b-a':'b-g';
   row.dataset.itemCode=item.code;
+  row.dataset.stockSource=item.source||'product';
   row.innerHTML=`<td class="mono">${escapeHtml(item.code)}</td><td>${escapeHtml(item.name)}</td><td><span class="b b-gray">${escapeHtml(item.category)}</span></td><td class="mono">${Number(item.available||0).toLocaleString('en-AE')}</td><td>${escapeHtml(item.unit)}</td><td class="mono">${Number(item.reorderLevel||0).toLocaleString('en-AE')}</td><td><span class="b ${cls}">${status}</span></td><td><button class="btn btn-g btn-sm" onclick="openRowDetail(this,'Stock Level Detail','Current Stock Levels')">View</button></td>`;
   return row;
 }
@@ -2701,15 +3047,178 @@ function openSupplierPopup(){
   setTimeout(()=>document.getElementById('vendor-name')?.focus(),50);
 }
 
+function isSupplierPaymentType(type=document.getElementById('payment-type')?.value){
+  return type==='Supplier Payment';
+}
+
+function openPaymentModal(type='Customer Receipt'){
+  const typeField=document.getElementById('payment-type');
+  if(typeField)typeField.value=type;
+  ['payment-ref','payment-contact','payment-document','payment-amount'].forEach(id=>setFieldValue(document.getElementById(id),''));
+  showM('m-payment');
+  setTimeout(()=>syncPaymentFormOptions(),0);
+}
+
+function collectPaymentContacts(type=document.getElementById('payment-type')?.value){
+  const selector=isSupplierPaymentType(type)?'#vendor-tbody tr:not([data-empty-state])':'#customer-tbody tr:not([data-empty-state])';
+  return [...document.querySelectorAll(selector)]
+    .map(row=>row.children[0]?.textContent.trim())
+    .filter(Boolean);
+}
+
+function paidPaymentDocumentRefs(type=document.getElementById('payment-type')?.value){
+  const supplier=isSupplierPaymentType(type);
+  const refs=new Set();
+  const rows=[...document.querySelectorAll(supplier?'#payment-out-tbody tr:not([data-empty-state])':'#payment-in-tbody tr:not([data-empty-state])')];
+  rows.forEach(row=>{
+    let payment={};
+    try{payment=JSON.parse(row.dataset.payment||'{}');}catch(_err){}
+    const ref=payment.document_ref||payment.bill_no||payment.invoice_no||row.children[2]?.textContent.trim();
+    if(ref&&ref!=='-'&&!/manual/i.test(ref))refs.add(String(ref).trim().toLowerCase());
+  });
+  return refs;
+}
+
+function isPendingDocumentStatus(status){
+  const text=String(status||'').trim().toLowerCase();
+  if(!text)return true;
+  return !/(paid|posted|settled|allocated|closed|reconciled|complete)/.test(text);
+}
+
+function collectPaymentDocuments(type=document.getElementById('payment-type')?.value){
+  const paidRefs=paidPaymentDocumentRefs(type);
+  if(isSupplierPaymentType(type)){
+    return [...document.querySelectorAll('#bill-tbody tr:not([data-empty-state])')].map(row=>({
+      ref:row.children[0]?.textContent.trim()||'',
+      contact:row.children[1]?.textContent.trim()||'',
+      amount:parseAmount(row.children[6]?.textContent||'0'),
+      status:row.children[7]?.textContent.trim()||''
+    })).filter(item=>item.ref&&isPendingDocumentStatus(item.status)&&!paidRefs.has(item.ref.toLowerCase()));
+  }
+  return [...document.querySelectorAll('#sales-invoice-tbody tr:not([data-empty-state])')].map(row=>{
+    let data={};
+    try{data=JSON.parse(row.dataset.salesInvoice||'{}');}catch(_err){}
+    if(isSalesReturn(data))return null;
+    return {
+      ref:data.invoice_no||row.children[0]?.textContent.trim()||'',
+      contact:data.customer||row.children[1]?.textContent.trim()||'',
+      amount:parseAmount(data.total??row.children[6]?.textContent??'0'),
+      status:data.status||row.children[8]?.textContent.trim()||''
+    };
+  }).filter(item=>item&&item.ref&&isPendingDocumentStatus(item.status)&&!paidRefs.has(item.ref.toLowerCase()));
+}
+
+function nextPaymentReference(type=document.getElementById('payment-type')?.value){
+  const supplier=isSupplierPaymentType(type);
+  const prefix=supplier?'PAY':'RCT';
+  const year=new Date().getFullYear();
+  const rows=[...document.querySelectorAll(supplier?'#payment-out-tbody tr:not([data-empty-state])':'#payment-in-tbody tr:not([data-empty-state])')];
+  const max=rows.reduce((highest,row)=>{
+    const ref=row.children[0]?.textContent.trim()||'';
+    const match=ref.match(/(\d+)$/);
+    return match?Math.max(highest,Number(match[1])):highest;
+  },0);
+  return `${prefix}-${year}-${String(max+1).padStart(4,'0')}`;
+}
+
+function syncPaymentFormOptions(){
+  const type=document.getElementById('payment-type')?.value||'Customer Receipt';
+  const supplier=isSupplierPaymentType(type);
+  const contactInput=document.getElementById('payment-contact');
+  const documentInput=document.getElementById('payment-document');
+  const contactOptions=document.getElementById('payment-contact-options');
+  const documentOptions=document.getElementById('payment-document-options');
+  const contactLabel=document.getElementById('payment-contact-label');
+  const documentLabel=document.getElementById('payment-document-label');
+  const refInput=document.getElementById('payment-ref');
+  if(contactLabel)contactLabel.textContent=supplier?'Vendor':'Customer';
+  if(documentLabel)documentLabel.textContent=supplier?'Bill':'Invoice';
+  if(contactInput)contactInput.placeholder=supplier?'Select vendor':'Select customer';
+  if(documentInput)documentInput.placeholder=supplier?'Select bill':'Select invoice';
+  if(refInput&&!refInput.value.trim())refInput.placeholder=nextPaymentReference(type);
+  if(contactOptions){
+    const names=[...new Set(collectPaymentContacts(type))];
+    contactOptions.innerHTML=names.map(name=>`<option value="${escapeHtml(name)}"></option>`).join('');
+  }
+  if(documentOptions){
+    const wanted=(contactInput?.value||'').trim().toLowerCase();
+    const docs=collectPaymentDocuments(type)
+      .filter(item=>!wanted||item.contact.toLowerCase()===wanted||item.contact.toLowerCase().includes(wanted));
+    documentOptions.innerHTML=docs.map(item=>{
+      const amount=Number(item.amount||0).toLocaleString('en-AE',{maximumFractionDigits:2});
+      return `<option value="${escapeHtml(item.ref)}" label="${escapeHtml(item.contact)} - AED ${escapeHtml(amount)}"></option>`;
+    }).join('');
+  }
+}
+
+function handlePaymentTypeChange(){
+  ['payment-ref','payment-contact','payment-document','payment-amount'].forEach(id=>setFieldValue(document.getElementById(id),''));
+  syncPaymentFormOptions();
+}
+
+function findPendingPaymentDocumentForContact(type,contact){
+  const wanted=String(contact||'').trim().toLowerCase();
+  if(!wanted)return null;
+  const docs=collectPaymentDocuments(type);
+  return docs.find(item=>item.contact.toLowerCase()===wanted)
+    || docs.find(item=>item.contact.toLowerCase().includes(wanted))
+    || null;
+}
+
+function applyPaymentContactSelection(){
+  const type=document.getElementById('payment-type')?.value||'Customer Receipt';
+  const contact=(document.getElementById('payment-contact')?.value||'').trim().toLowerCase();
+  syncPaymentFormOptions();
+  if(!contact)return;
+  const pendingDoc=findPendingPaymentDocumentForContact(type,contact);
+  if(pendingDoc){
+    setFieldValue(document.getElementById('payment-document'),pendingDoc.ref);
+    if(pendingDoc.amount)setFieldValue(document.getElementById('payment-amount'),Number(pendingDoc.amount).toFixed(2));
+  }else{
+    setFieldValue(document.getElementById('payment-document'),'');
+    setFieldValue(document.getElementById('payment-amount'),'');
+  }
+}
+
+function applyPaymentDocumentSelection(){
+  const type=document.getElementById('payment-type')?.value||'Customer Receipt';
+  const documentInput=document.getElementById('payment-document');
+  const selected=(documentInput?.value||'').trim().toLowerCase();
+  if(!selected)return;
+  const doc=collectPaymentDocuments(type).find(item=>item.ref.toLowerCase()===selected);
+  if(!doc)return;
+  setFieldValue(document.getElementById('payment-contact'),doc.contact);
+  if(doc.amount)setFieldValue(document.getElementById('payment-amount'),Number(doc.amount).toFixed(2));
+  syncPaymentFormOptions();
+}
+
+function markPaymentDocumentPaid(payment){
+  const ref=String(payment?.document_ref||payment?.bill_no||payment?.invoice_no||'').trim().toLowerCase();
+  if(!ref)return;
+  const tbody=document.getElementById(payment?.type==='Supplier Payment'?'bill-tbody':'sales-invoice-tbody');
+  const row=[...(tbody?.querySelectorAll('tr:not([data-empty-state])')||[])]
+    .find(item=>(item.children[0]?.textContent||'').trim().toLowerCase()===ref);
+  if(!row)return;
+  const statusCell=row.children[payment?.type==='Supplier Payment'?7:8];
+  if(statusCell)statusCell.innerHTML='<span class="b b-g">Paid</span>';
+}
+
 function renderPaymentRecord(payment){
   const tbody=document.getElementById(payment?.type==='Supplier Payment'?'payment-out-tbody':'payment-in-tbody');
-  if(!tbody||!payment?.ref||hasFirstCellValue(tbody,payment.ref))return;
-  const label=payment.type==='Supplier Payment'?'Vendor':'Manual';
+  if(payment?.ref)financePaymentsByRef.set(String(payment.ref),payment);
+  if(!tbody||!payment?.ref||hasFirstCellValue(tbody,payment.ref)){
+    updateFinanceFromDatabaseRecords();
+    return;
+  }
+  const documentRef=payment.document_ref||payment.invoice_no||payment.bill_no||'-';
   const row=document.createElement('tr');
   row.dataset.serverRecord='payments';
-  row.innerHTML=`<td class="mono">${escapeHtml(payment.ref)}</td><td>${escapeHtml(payment.contact)}</td><td class="mono">${escapeHtml(label)}</td><td>${escapeHtml(payment.method||'Bank Transfer')}</td><td>${escapeHtml(payment.date)}</td><td class="mono">${Number(payment.amount||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td><span class="b b-g">Posted</span></td>`;
+  row.dataset.payment=JSON.stringify(payment);
+  row.innerHTML=`<td class="mono">${escapeHtml(payment.ref)}</td><td>${escapeHtml(payment.contact)}</td><td class="mono">${escapeHtml(documentRef)}</td><td>${escapeHtml(payment.method||'Bank Transfer')}</td><td>${escapeHtml(payment.date)}</td><td class="mono">${Number(payment.amount||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td><span class="b b-g">Posted</span></td>`;
   removeEmptyState(tbody);
   tbody.prepend(row);
+  markPaymentDocumentPaid(payment);
+  updateFinanceFromDatabaseRecords();
 }
 
 function bankAccountKey(account){
@@ -2720,11 +3229,15 @@ function renderBankAccountRecord(account){
   const tbody=document.getElementById('bank-account-tbody');
   const key=bankAccountKey(account);
   if(!tbody||!key)return;
+  financeBankAccountsByKey.set(key,account);
   const exists=[...tbody.querySelectorAll('tr:not([data-empty-state])')]
     .some(row=>bankAccountKey({iban:row.dataset.iban,bank:row.dataset.bank})===key);
-  if(exists)return;
+  if(exists){
+    updateFinanceFromDatabaseRecords();
+    return;
+  }
   const currency=account.currency||'AED';
-  const balance=Number(account.balance||0);
+  const balance=Number(account.balance??account.opening_balance??0);
   const type=account.type||account.account_type||'Current';
   const typeClass=String(type).toLowerCase().includes('saving')?'b-t':'b-b';
   const row=document.createElement('tr');
@@ -2734,16 +3247,77 @@ function renderBankAccountRecord(account){
   row.innerHTML=`<td><div class="flx"><span style="font-size:18px">🏦</span><span>${escapeHtml(account.bank||account.bank_name||'Bank')}</span></div></td><td>${escapeHtml(account.holder||account.account_holder||account.name||'-')}</td><td class="mono">${escapeHtml(account.iban||'-')}</td><td>${escapeHtml(currency)}</td><td><span class="b ${typeClass}">${escapeHtml(type)}</span></td><td class="mono" style="color:var(--green)">${escapeHtml(currency)} ${balance.toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2})}</td><td><span class="b b-g">${escapeHtml(account.status||'Active')}</span></td><td><button class="btn btn-g btn-sm" onclick="toast('Syncing with bank...','info')">Sync</button></td>`;
   removeEmptyState(tbody);
   tbody.prepend(row);
-  updateBankAccountSummary();
+  updateFinanceFromDatabaseRecords();
+}
+
+function currentFinancePayments(){
+  return [...financePaymentsByRef.values()];
+}
+
+function currentFinanceBankAccounts(){
+  return [...financeBankAccountsByKey.values()];
+}
+
+function updateFinanceFromDatabaseRecords(){
+  const payments=currentFinancePayments();
+  const bankAccounts=currentFinanceBankAccounts();
+  const openingBalance=bankAccounts.reduce((sum,account)=>sum+Number(account.balance??account.opening_balance??0),0);
+  const inflow=payments
+    .filter(payment=>String(payment.type||'Customer Receipt').toLowerCase()!=='supplier payment')
+    .reduce((sum,payment)=>sum+Number(payment.amount||0),0);
+  const outflow=payments
+    .filter(payment=>String(payment.type||'').toLowerCase()==='supplier payment')
+    .reduce((sum,payment)=>sum+Number(payment.amount||0),0);
+  const bookBalance=openingBalance+inflow-outflow;
+  const stats=[...document.querySelectorAll('#bk-accounts .stat-val')];
+  if(stats[0])stats[0].textContent=formatAed(bookBalance);
+  if(stats[1])stats[1].textContent=formatAed(inflow);
+  if(stats[2])stats[2].textContent=formatAed(outflow);
+  renderBankTransactions(payments,openingBalance);
+  updateBankReconciliation(openingBalance,bookBalance,payments.length);
 }
 
 function updateBankAccountSummary(){
-  const rows=[...document.querySelectorAll('#bank-account-tbody tr:not([data-empty-state])')];
-  const total=rows.reduce((sum,row)=>sum+parseAmount(row.children[5]?.textContent),0);
-  const stats=[...document.querySelectorAll('#bk-accounts .stat-val')];
-  if(stats[0])stats[0].textContent=formatAed(total);
-  if(stats[1])stats[1].textContent=formatAed(0);
-  if(stats[2])stats[2].textContent=formatAed(0);
+  updateFinanceFromDatabaseRecords();
+}
+
+function renderBankTransactions(payments=currentFinancePayments(),openingBalance=0){
+  const tbody=document.getElementById('bank-transaction-tbody');
+  if(!tbody)return;
+  if(!payments.length){
+    emptyTableMessage(tbody,'No bank transactions in database yet.');
+    return;
+  }
+  const sorted=[...payments].sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))||String(b.ref||'').localeCompare(String(a.ref||'')));
+  let running=openingBalance;
+  const rows=sorted.map(payment=>{
+    const isOut=String(payment.type||'').toLowerCase()==='supplier payment';
+    const amount=Number(payment.amount||0);
+    running+=isOut?-amount:amount;
+    const category=isOut?'Payment':'Receipt';
+    const badge=isOut?'b-r':'b-g';
+    return `<tr><td>${escapeHtml(payment.date||'-')}</td><td>${escapeHtml(payment.contact||'Finance transaction')} - ${escapeHtml(payment.ref||'')}</td><td class="mono" style="${isOut?'color:var(--red)':''}">${isOut?formatFinanceAmount(amount):'-'}</td><td class="mono" style="${isOut?'':'color:var(--green)'}">${isOut?'-':formatFinanceAmount(amount)}</td><td class="mono">${formatFinanceAmount(running)}</td><td><span class="b ${badge}">${escapeHtml(category)}</span></td></tr>`;
+  });
+  tbody.innerHTML=rows.join('');
+  refreshEnhancedTable(tbody.closest('table'));
+}
+
+function updateBankReconciliation(statementBalance,bookBalance,transactionCount){
+  const difference=statementBalance-bookBalance;
+  setText('bank-statement-balance',formatAed(statementBalance));
+  setText('bank-book-balance',formatAed(bookBalance));
+  setText('bank-reconcile-difference',formatAed(Math.abs(difference)));
+  const note=document.getElementById('bank-reconcile-note');
+  if(note){
+    note.textContent=Math.abs(difference)<=0.01
+      ? 'No unmatched items'
+      : `${transactionCount} recorded transaction${transactionCount===1?'':'s'} not in statement balance`;
+    note.classList.toggle('dn',Math.abs(difference)>0.01);
+  }
+}
+
+function formatFinanceAmount(value){
+  return Number(value||0).toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2});
 }
 
 function buildBankAccountFromForm(){
@@ -2756,7 +3330,8 @@ function buildBankAccountFromForm(){
     currency:document.getElementById('bank-currency')?.value||'AED',
     swift:document.getElementById('bank-swift')?.value?.trim()||'',
     branch:document.getElementById('bank-branch')?.value?.trim()||'',
-    balance:0,
+    balance:parseAmount(document.getElementById('bank-balance')?.value),
+    opening_balance:parseAmount(document.getElementById('bank-balance')?.value),
     status:'Active'
   };
 }
@@ -2770,7 +3345,7 @@ function saveBankAccount(){
   renderBankAccountRecord(record);
   saveServer('bankAccounts',record);
   closeM('m-bank');
-  ['bank-holder','bank-iban','bank-swift','bank-branch'].forEach(id=>setFieldValue(document.getElementById(id),''));
+  ['bank-holder','bank-iban','bank-balance','bank-swift','bank-branch'].forEach(id=>setFieldValue(document.getElementById(id),''));
   toast('Bank account added','ok');
   audit('Added bank account',record.bank,'Saved');
 }
@@ -3152,9 +3727,49 @@ function renderAccountRecord(account){
   const row=document.createElement('tr');
   row.dataset.serverRecord='accounts';
   row.dataset.accountId=account.id||'';
-  row.innerHTML=`<td class="mono">${escapeHtml(account.code)}</td><td>${escapeHtml(account.name)}</td><td><span class="b ${typeClass}">${escapeHtml(type)}</span></td><td>${escapeHtml(account.category||'Current')}</td><td class="mono">0.00</td><td><span class="b ${account.is_active===false?'b-gray':'b-g'}">${account.is_active===false?'Inactive':'Active'}</span></td><td><button class="btn btn-g btn-sm" onclick="viewAccountLedger(this)">View</button></td>`;
+  row.dataset.account=JSON.stringify(account);
+  row.innerHTML=`<td class="mono">${escapeHtml(account.code)}</td><td>${escapeHtml(account.name)}</td><td><span class="b ${typeClass}">${escapeHtml(type)}</span></td><td>${escapeHtml(account.category||'Current')}</td><td class="mono">0.00</td><td><span class="b ${account.is_active===false?'b-gray':'b-g'}">${account.is_active===false?'Inactive':'Active'}</span></td><td><div class="row-actions"><button class="icon-btn" title="View ledger" onclick="viewAccountLedger(this)">${viewIconSvg()}</button><button class="icon-btn danger" title="Delete account" onclick="deleteAccountRow(this)">${deleteIconSvg()}</button></div></td>`;
   removeEmptyState(tbody);
   tbody.appendChild(row);
+}
+
+function accountRecordFromRow(row){
+  if(row?.dataset.account){
+    try{return JSON.parse(row.dataset.account);}catch{}
+  }
+  const cells=row?.children||[];
+  return {
+    id:row?.dataset.accountId||'',
+    code:cells[0]?.textContent.trim()||'',
+    name:cells[1]?.textContent.trim()||'',
+    type:cells[2]?.textContent.trim()||'',
+    category:cells[3]?.textContent.trim()||''
+  };
+}
+
+function deleteAccountRow(btn){
+  const row=btn.closest('tr');
+  const table=row?.closest('table');
+  if(!row||!table)return;
+  const reason=rowDeleteBlockReason(row,table);
+  const record=accountRecordFromRow(row);
+  const label=record.code||record.name||'account';
+  if(reason){
+    toast(`Cannot delete ${label}: ${reason}`,'warn');
+    audit('Delete blocked',label,reason);
+    return;
+  }
+  if(!window.confirm(`Delete account ${label}?`))return;
+  row.remove();
+  if(record.id||row.dataset.accountId){
+    moduleApi(`/accounts/${encodeURIComponent(record.id||row.dataset.accountId)}`,{method:'DELETE'})
+      .catch(err=>toast(`Account removed from screen, database delete failed: ${err.message}`,'warn'));
+  }
+  deleteServer('accounts',record);
+  updateAccountSelectors();
+  refreshEnhancedTable(table);
+  audit('Deleted chart account',label,'Deleted');
+  toast('Account deleted','warn');
 }
 
 function renderRecordList(records,renderRecord,label){
@@ -3199,6 +3814,8 @@ function hydrateFromServer(){
     isHydratingFromServer=true;
     const renderStats={};
     try{
+      financePaymentsByRef.clear();
+      financeBankAccountsByKey.clear();
       if(data.company)applyCompanyToUi(data.company);
       renderStats.products=renderRecordList(data.products,product=>renderProductRecord(product,{deferRefresh:true,deferStockSync:true,deferMappingSync:true,deferSuggestions:true}),'product');
       renderStats.salesCategories=renderRecordList(data.salesCategories,renderSalesCategoryRecord,'sales category');
@@ -3217,6 +3834,9 @@ function hydrateFromServer(){
       renderStats.vendors=renderRecordList(data.vendors,renderVendorRecord,'vendor');
       renderStats.payments=renderRecordList(data.payments,renderPaymentRecord,'payment');
       renderStats.bankAccounts=renderRecordList(data.bankAccounts,renderBankAccountRecord,'bank account');
+      renderStats.rotaShifts=renderRecordList(data.rotaShifts,renderRotaShiftRecord,'rota shift');
+      renderStats.rotaSwaps=renderRecordList(data.rotaSwaps,renderRotaSwapRecord,'rota swap');
+      renderStats.rotaApprovals=renderRecordList(data.rotaApprovals,renderRotaApprovalRecord,'rota approval');
       renderStats.expenses=renderRecordList(data.expenses,renderExpenseRecord,'expense');
       renderStats.purchaseRecords={rendered:0,failed:0,total:0,lazy:true};
       loadPurchaseDocumentsFromServer(data.purchaseDocuments||[],[]);
@@ -3231,6 +3851,9 @@ function hydrateFromServer(){
       data.bills,
       data.vendors,
       data.payments,
+      data.rotaShifts,
+      data.rotaSwaps,
+      data.rotaApprovals,
       []
     ].reduce((sum,rows)=>sum+(Array.isArray(rows)?rows.length:0),0);
     window.__taxflowLastDbLoad={at:new Date().toISOString(),totalLoaded,renderStats};
@@ -3264,6 +3887,7 @@ function hydrateFromServer(){
     loadStockMappingsFromServer();
     loadAccountingFromDb();
     loadCorporateAccountingFromDb(data);
+    updateFinanceFromDatabaseRecords();
     filterLedger();
     refreshActivePageTables();
     refreshInitializedTables();
@@ -3327,16 +3951,18 @@ function normalizeExtractedPurchaseInvoices(invoices=[],filename=''){
     const inv={...(source||{})};
     const fallbackNo=String(inv.invoice_no||inv.invoice_number||inv.ref||'').trim()||`${filename||'PURCHASE'}-${index+1}`;
     const key=invoiceKey(fallbackNo);
+    const extractionError=isPurchaseExtractionError(inv);
     if(!grouped.has(key)){
       grouped.set(key,{
         ...inv,
         invoice_no:fallbackNo,
-        subtotal:Number(inv.subtotal||inv.net_amount||0),
-        vat_amount:Number(inv.vat_amount||inv.tax_amount||0),
-        total:Number(inv.total||0),
-        paid:Number(inv.paid||0),
-        shipping:Number(inv.shipping||0),
-        confidence:Number(inv.confidence||0),
+        subtotal:purchaseAiNumber(inv.subtotal||inv.net_amount),
+        vat_amount:purchaseAiNumber(inv.vat_amount||inv.tax_amount),
+        total:purchaseAiNumber(inv.total),
+        paid:purchaseAiNumber(inv.paid),
+        shipping:purchaseAiNumber(inv.shipping),
+        confidence:purchaseAiNumber(inv.confidence),
+        extraction_error:extractionError,
         lines:[]
       });
     }
@@ -3344,45 +3970,79 @@ function normalizeExtractedPurchaseInvoices(invoices=[],filename=''){
     ['date','supplier','supplier_trn','address','pay_term','payment_method','payment_account','payment_note','paid_on','shipping_details','notes','tax_type','discount_type','status','issues'].forEach(field=>{
       if(!target[field]&&inv[field])target[field]=inv[field];
     });
-    target.confidence=Math.max(Number(target.confidence||0),Number(inv.confidence||0));
-    target.subtotal=Math.max(Number(target.subtotal||0),Number(inv.subtotal||inv.net_amount||0));
-    target.vat_amount=Math.max(Number(target.vat_amount||0),Number(inv.vat_amount||inv.tax_amount||0));
-    target.total=Math.max(Number(target.total||0),Number(inv.total||0));
-    target.paid=Math.max(Number(target.paid||0),Number(inv.paid||0));
-    target.shipping=Math.max(Number(target.shipping||0),Number(inv.shipping||0));
-    const lines=Array.isArray(inv.lines)&&inv.lines.length?inv.lines:[lineFromInvoiceLike(inv)];
+    target.confidence=Math.max(purchaseAiNumber(target.confidence),purchaseAiNumber(inv.confidence));
+    target.subtotal=Math.max(purchaseAiNumber(target.subtotal),purchaseAiNumber(inv.subtotal||inv.net_amount));
+    target.vat_amount=Math.max(purchaseAiNumber(target.vat_amount),purchaseAiNumber(inv.vat_amount||inv.tax_amount));
+    target.total=Math.max(purchaseAiNumber(target.total),purchaseAiNumber(inv.total));
+    target.paid=Math.max(purchaseAiNumber(target.paid),purchaseAiNumber(inv.paid));
+    target.shipping=Math.max(purchaseAiNumber(target.shipping),purchaseAiNumber(inv.shipping));
+    const lines=extractionError?[]:(Array.isArray(inv.lines)&&inv.lines.length?inv.lines:[lineFromInvoiceLike(inv)]);
     lines.filter(Boolean).forEach(line=>{
       const product=purchaseAiProductName(line);
-      const qty=Number(line.quantity||line.qty||0);
-      const amount=Number(line.line_total||line.amount||0);
+      const qty=purchaseAiNumber(line.quantity||line.qty);
+      const amount=purchaseAiNumber(line.line_total||line.amount);
       const duplicate=target.lines.some(existing=>
         purchaseAiProductName(existing).toLowerCase()===product.toLowerCase()&&
-        Number(existing.quantity||existing.qty||0)===qty&&
-        Number(existing.line_total||existing.amount||0)===amount
+        purchaseAiNumber(existing.quantity||existing.qty)===qty&&
+        purchaseAiNumber(existing.line_total||existing.amount)===amount
       );
-      if(!duplicate)target.lines.push(line);
+      if(!duplicate)target.lines.push(normalizePurchaseAiLine(line));
     });
   });
   return [...grouped.values()].map(inv=>{
-    const lineSubtotal=inv.lines.reduce((sum,line)=>sum+Number(line.line_total||line.amount||0),0);
-    if(lineSubtotal&&(!Number(inv.subtotal||0)||inv.lines.length>1))inv.subtotal=Math.max(Number(inv.subtotal||0),lineSubtotal);
-    if(!Number(inv.total||0))inv.total=Number(inv.subtotal||0)+Number(inv.vat_amount||0)+Number(inv.shipping||0);
-    inv.due=Math.max(0,Number(inv.total||0)-Number(inv.paid||0));
+    const lineSubtotal=inv.lines.reduce((sum,line)=>sum+purchaseAiNumber(line.line_total||line.amount),0);
+    if(lineSubtotal&&(!purchaseAiNumber(inv.subtotal)||inv.lines.length>1))inv.subtotal=Math.max(purchaseAiNumber(inv.subtotal),lineSubtotal);
+    if(!purchaseAiNumber(inv.total))inv.total=purchaseAiNumber(inv.subtotal)+purchaseAiNumber(inv.vat_amount)+purchaseAiNumber(inv.shipping);
+    inv.due=Math.max(0,purchaseAiNumber(inv.total)-purchaseAiNumber(inv.paid));
     inv.items=inv.lines.length;
+    if(isPurchaseExtractionError(inv))inv.lines=[];
     return inv;
   });
 }
 
+function isPurchaseExtractionError(inv={}){
+  return Boolean(inv.extraction_error)||(
+    String(inv.status||'').toLowerCase()==='error'&&
+    purchaseAiNumber(inv.confidence)<=0&&
+    (!Array.isArray(inv.lines)||inv.lines.length===0)
+  );
+}
+
+function purchaseAiNumber(value){
+  return parseAmount(value);
+}
+
+function normalizePurchaseAiLine(line={}){
+  const quantity=purchaseAiNumber(line.quantity||line.qty||1)||1;
+  const lineTotal=purchaseAiNumber(line.line_total||line.amount||line.total);
+  const unitCost=purchaseAiNumber(line.unit_cost||line.cost||line.unitCost||line.unit_price);
+  const beforeTax=purchaseAiNumber(line.unit_cost_before_tax||line.unit_cost||line.cost||line.unit_price||unitCost);
+  return {
+    ...line,
+    product:purchaseAiProductName(line)||line.product||line.description||line.item_description||'Purchase item',
+    quantity,
+    unit:line.unit||line.unit_of_measure||line.uom||'PCS',
+    unit_cost:unitCost||beforeTax||(lineTotal/Math.max(1,quantity)),
+    unit_cost_before_tax:beforeTax||unitCost||(lineTotal/Math.max(1,quantity)),
+    line_total:lineTotal||(quantity*(beforeTax||unitCost)),
+    discount_percent:purchaseAiNumber(line.discount_percent||line.discountPct||line.discount_pct),
+    profit_margin:purchaseAiNumber(line.profit_margin||line.margin),
+    selling_price_inc_tax:purchaseAiNumber(line.selling_price_inc_tax||line.selling_price),
+    raw:line.raw||{}
+  };
+}
+
 function lineFromInvoiceLike(inv={}){
   const product=purchaseAiProductName(inv)||'Extracted purchase item';
-  const subtotal=Number(inv.subtotal||inv.net_amount||inv.line_total||inv.amount||0);
+  const subtotal=purchaseAiNumber(inv.subtotal||inv.net_amount||inv.line_total||inv.amount);
+  if(isPurchaseExtractionError(inv))return null;
   if(!product&&!subtotal)return null;
   return {
     product,
-    quantity:Number(inv.quantity||inv.qty||1),
+    quantity:purchaseAiNumber(inv.quantity||inv.qty||1)||1,
     unit:inv.unit||'PCS',
-    unit_cost:Number(inv.unit_cost||inv.cost||subtotal||0),
-    line_total:subtotal||Number(inv.total||0),
+    unit_cost:purchaseAiNumber(inv.unit_cost||inv.cost||subtotal),
+    line_total:subtotal||purchaseAiNumber(inv.total),
     raw:inv.raw||{}
   };
 }
@@ -3757,18 +4417,31 @@ function salesInvoiceActionsHtml(){
   </div>`;
 }
 
+function isSalesReturn(inv={}){
+  return String(inv.document_type||inv.source||inv.status||'').toLowerCase().includes('return');
+}
+
+function salesRegisterTbody(inv={}){
+  return document.getElementById(isSalesReturn(inv)?'sales-return-tbody':'sales-invoice-tbody');
+}
+
+function salesRegisterRows(){
+  return [...document.querySelectorAll('#sales-invoice-tbody tr:not([data-empty-state]),#sales-return-tbody tr:not([data-empty-state])')];
+}
+
 function addSalesInvoiceRow(inv,options={persist:true}){
-  const tbody=document.getElementById('sales-invoice-tbody');
+  const tbody=salesRegisterTbody(inv);
   if(!tbody||!inv.invoice_no)return false;
-  const exists=salesInvoiceDbKeys.has(invoiceKey(inv.invoice_no))||[...tbody.querySelectorAll('td.mono:first-child')].some(td=>td.textContent===inv.invoice_no);
+  const exists=salesInvoiceDbKeys.has(invoiceKey(inv.invoice_no))||salesRegisterRows().some(row=>row.children[0]?.textContent===inv.invoice_no);
   if(exists)return false;
   const fmt=n=>Number(n||0).toLocaleString('en-AE',{maximumFractionDigits:2});
   const source=inv.source||((inv.sourceFile||inv.confidence)?'AI Upload':'Manual');
-  const sourceClass=String(source).toLowerCase().includes('ai')?'b-p':'b-gray';
+  const returnDoc=isSalesReturn(inv);
+  const sourceClass=returnDoc?'b-r':String(source).toLowerCase().includes('ai')?'b-p':'b-gray';
   const status=inv.status||'Draft';
-  const statusClass=String(status).toLowerCase().includes('draft')?'b-gray':'b-a';
+  const statusClass=returnDoc?'b-r':String(status).toLowerCase().includes('draft')?'b-gray':'b-a';
   const row=document.createElement('tr');
-  row.dataset.salesInvoice=JSON.stringify({...inv,source,status});
+  row.dataset.salesInvoice=JSON.stringify({...inv,source,status,document_type:returnDoc?'Sales Return':(inv.document_type||'Sales Invoice')});
   row.dataset.rowActionsAdded='1';
   row.innerHTML=`<td class="mono">${escapeHtml(inv.invoice_no)}</td><td>${escapeHtml(inv.customer)}</td><td>${escapeHtml(inv.date)}</td><td>${escapeHtml(inv.due_date||'30 days')}</td><td class="mono">${fmt(inv.subtotal)}</td><td class="mono">${fmt(inv.vat_amount)}</td><td class="mono">${fmt(inv.total)}</td><td><span class="b ${sourceClass}">${escapeHtml(source)}</span></td><td><span class="b ${statusClass}">${escapeHtml(status)}</span></td><td data-action-col="1">${salesInvoiceActionsHtml()}</td>`;
   removeEmptyState(tbody);
@@ -3921,6 +4594,11 @@ function invoiceLabels(layout){
     authorizedSignature:invoiceUsesArabic(layout)&&layout.signatureLabel==='Authorized Signature'?bilingual('Authorized Signature','التوقيع المعتمد'):layout.signatureLabel,
     digitalGenerated:bilingual('Digital invoice generated by TaxFlow','تم إنشاء الفاتورة الرقمية بواسطة TaxFlow')
   };
+}
+
+function salesDocumentHeading(inv={},layout=getInvoiceLayout()){
+  if(!isSalesReturn(inv))return invoiceLabels(layout).heading;
+  return 'Sales Return';
 }
 
 function getInvoiceLayout(){
@@ -4279,6 +4957,7 @@ function encodePublicInvoicePayload(payload){
 function publicInvoicePayload(inv=currentSalesInvoice){
   const layout=getInvoiceLayout();
   const labels=invoiceLabels(layout);
+  const heading=salesDocumentHeading(inv,layout);
   const companyTrn=currentCompany?.trn||document.getElementById('set-company-trn')?.value||'';
   return {
     company:{
@@ -4295,7 +4974,7 @@ function publicInvoicePayload(inv=currentSalesInvoice){
       paymentLink:layout.paymentLink,
       footer:layout.footer,
       color:layout.color,
-      taxLabel:labels.heading,
+      taxLabel:heading,
       trnLabel:layout.trnLabel,
       customerTrnLabel:layout.customerTrnLabel,
       enableRtl:layout.enableRtl,
@@ -4318,6 +4997,7 @@ function publicInvoicePayload(inv=currentSalesInvoice){
       total:Number(inv?.total||0),
       terms:layout.terms,
       labels:{
+        heading,
         billTo:labels.billTo,
         issueDate:labels.issueDate,
         dueDate:labels.dueDate,
@@ -4614,6 +5294,7 @@ function updateInvoiceLayoutPreview(){
   const qrValue=invoiceQrValue(sampleInvoice,layout);
   const qrType=layout.qrCodeType==='payment_url'?'invoice_url':layout.qrCodeType;
   const labels=invoiceLabels(layout);
+  const heading=salesDocumentHeading(inv,layout);
   preview.innerHTML=`
     <div class="invoice-layout-live" dir="${layout.enableRtl?'rtl':'ltr'}" style="--invoice-accent:${escapeHtml(layout.color)}">
       <div class="invoice-topbar"></div>
@@ -4718,7 +5399,7 @@ function renderSalesInvoicePreview(inv){
     layout.showCompanyStamp&&[labels.companyStamp,'']
   ].filter(Boolean);
 
-  if(title)title.textContent='Invoice '+(inv.invoice_no||'Draft');
+  if(title)title.textContent=(isSalesReturn(inv)?'Sales Return ':'Invoice ')+(inv.invoice_no||'Draft');
   if(sub)sub.textContent=(inv.customer||'Customer')+' - '+status;
 
   body.innerHTML=`
@@ -4734,7 +5415,7 @@ function renderSalesInvoicePreview(inv){
           </div>
         </div>
         <div class="invoice-titlebox" style="align-items:${brandJustify};text-align:${textAlign}">
-          <div class="invoice-label">${escapeHtml(labels.heading)}</div>
+          <div class="invoice-label">${escapeHtml(heading)}</div>
           <div class="invoice-number mono">${escapeHtml(inv.invoice_no||'Draft')}</div>
           <span class="invoice-status">${escapeHtml(status)}</span>
         </div>
@@ -4838,12 +5519,30 @@ function buildDraftInvoice(){
     const qty=parseAmount(row.querySelector('.inv-qty')?.value);
     const price=parseAmount(row.querySelector('.inv-price')?.value);
     const description=(row.querySelector('.inv-product')?.value||'').trim();
-    return {description:description||'Item',unit:row.querySelector('.inv-unit')?.value||'',qty,price,amount:qty*price};
+    return {
+      description:description||'Item',
+      unit:row.querySelector('.inv-unit')?.value||'',
+      qty,
+      price,
+      unit_price:price,
+      amount:qty*price,
+      product_code:row.dataset.productCode||'',
+      product_name:row.dataset.productName||description||'',
+      price_source:row.dataset.priceSource||'Manual',
+      price_snapshot:parseAmount(row.dataset.priceSnapshot||price),
+      inventory_mapping_id:row.dataset.mappingId||'',
+      inventory_mapped:row.dataset.mapped==='true',
+      mapping_price:parseAmount(row.dataset.sourcePrice||price),
+      mapping_cost:parseAmount(row.dataset.mappingCost||0),
+      markup_percent:parseAmount(row.dataset.markupPercent||0),
+      tax_rate:parseAmount(row.dataset.taxRate||5)
+    };
   }).filter(line=>line.description||line.qty||line.price);
   const subtotal=lines.reduce((sum,line)=>sum+line.amount,0);
   const vat=subtotal*.05;
   return {
     invoice_no:invoiceNo,
+    document_type:currentSalesTransactionType==='return'?'Sales Return':'Sales Invoice',
     customer:(document.getElementById('inv-cust')?.value||'').trim()||'Customer',
     customer_trn:document.getElementById('inv-ctrn')?.value||'TRN not provided',
     customer_address:document.getElementById('inv-caddr')?.value||'',
@@ -4856,7 +5555,7 @@ function buildDraftInvoice(){
     vat_amount:vat,
     total:subtotal+vat,
     status:'Draft',
-    source:'Manual',
+    source:currentSalesTransactionType==='return'?'Sales Return':'Manual',
     lines
   };
 }
@@ -4875,8 +5574,69 @@ function showSalesInvoiceRegister(){
   if(tab)stab(tab,'s-invoices');
 }
 
+function openSalesAddChoice(){
+  showAddChoice('Sales',[
+    {title:'Sales Invoice',sub:'Create a normal customer sales invoice',action:"startSalesTransaction('sale')"},
+    {title:'Sales Return',sub:'Create a customer return / credit document',action:"startSalesTransaction('return')"}
+  ]);
+}
+
+function openPurchaseAddChoice(){
+  showAddChoice('Purchase',[
+    {title:'Purchase Invoice',sub:'Create a normal supplier purchase entry',action:"startPurchaseTransaction('purchase')"},
+    {title:'Purchase Return',sub:'Create a supplier return / debit note',action:"startPurchaseTransaction('return')"}
+  ]);
+}
+
+function showAddChoice(scope,items){
+  const title=document.getElementById('add-choice-title');
+  const sub=document.getElementById('add-choice-sub');
+  const box=document.getElementById('add-choice-options');
+  if(title)title.textContent=`Add New ${scope}`;
+  if(sub)sub.textContent='Confirm the document type before opening the entry form';
+  if(box)box.innerHTML=items.map(item=>`
+    <button class="btn btn-g" style="display:block;text-align:left;padding:14px;width:100%" onclick="${item.action}">
+      <strong>${escapeHtml(item.title)}</strong>
+      <div style="font-size:12px;color:var(--text3);margin-top:4px">${escapeHtml(item.sub)}</div>
+    </button>
+  `).join('');
+  showM('m-add-choice');
+}
+
+function startSalesTransaction(type='sale'){
+  currentSalesTransactionType=type==='return'?'return':'sale';
+  closeM('m-add-choice');
+  go('sales');
+  setTimeout(()=>{
+    const tab=document.querySelector('#page-sales .tab:nth-child(5)');
+    if(tab)stab(tab,'s-create');
+    configureSalesFormMode();
+  },50);
+}
+
+function configureSalesFormMode(){
+  const isReturn=currentSalesTransactionType==='return';
+  setText('sales-form-title',isReturn?'Sales Return Details':'Invoice Details');
+  setText('sales-form-sub',isReturn?'Create a customer return for returned goods or credit adjustment':'Create a sales invoice for goods or services');
+  setText('sales-no-label',isReturn?'Return No.':'Invoice No.');
+  setText('sales-date-label',isReturn?'Return Date':'Invoice Date');
+  setText('sales-total-label',isReturn?'Return Total':'Total');
+  setText('sales-save-send-btn',isReturn?'Save Return':'Save and Send');
+  const invNo=document.getElementById('inv-no');
+  if(invNo&&(!invNo.value||(isReturn&&/^INV-/i.test(invNo.value))||(!isReturn&&/^SR-/i.test(invNo.value)))){
+    invNo.value=`${isReturn?'SR':'INV'}-${new Date().getFullYear()}-${String(Date.now()).slice(-5)}`;
+  }
+}
+
 function saveDraftInvoice(options={}){
   const inv={...buildDraftInvoice(),status:options.status||'Draft'};
+  if(currentSalesTransactionType==='return'){
+    inv.document_type='Sales Return';
+    inv.source='Sales Return';
+    inv.status=options.status||'Return';
+  }else{
+    inv.document_type='Sales Invoice';
+  }
   const message=validateDraftInvoice(inv);
   if(message){
     toast(message,'warn');
@@ -4889,7 +5649,7 @@ function saveDraftInvoice(options={}){
     toast(options.toast||'Invoice saved to register','ok');
     clearDraftInvoiceForm();
   }else{
-    toast(`Invoice ${inv.invoice_no} is already in the register`,'warn');
+    toast(`${currentSalesTransactionType==='return'?'Sales return':'Invoice'} ${inv.invoice_no} is already in the register`,'warn');
   }
   if(options.showRegister!==false)showSalesInvoiceRegister();
   return inv;
@@ -4922,9 +5682,18 @@ function clearDraftInvoiceForm(){
   }
   currentSalesInvoice=null;
   calcLine(null);
+  configureSalesFormMode();
 }
 
 function saveAndSendDraftInvoice(){
+  if(currentSalesTransactionType==='return'){
+    saveDraftInvoice({
+      status:'Return',
+      auditAction:'Saved sales return',
+      toast:'Sales return saved to register'
+    });
+    return;
+  }
   const inv=saveDraftInvoice({
     status:'Pending',
     showRegister:false,
@@ -4935,13 +5704,27 @@ function saveAndSendDraftInvoice(){
 }
 
 function openDraftInvoicePreview(){
-  const inv=buildDraftInvoice();
+  const inv={
+    ...buildDraftInvoice(),
+    document_type:currentSalesTransactionType==='return'?'Sales Return':'Sales Invoice',
+    status:currentSalesTransactionType==='return'?'Return Preview':'Draft'
+  };
   renderSalesInvoicePreview(inv);
   showM('m-sales-view');
-  audit('Previewed draft invoice',inv.invoice_no,'Viewed');
+  audit(currentSalesTransactionType==='return'?'Previewed sales return':'Previewed draft invoice',inv.invoice_no,'Viewed');
 }
 
 function openDraftInvoiceShare(){
+  if(currentSalesTransactionType==='return'){
+    const inv=saveDraftInvoice({
+      status:'Return',
+      showRegister:false,
+      auditAction:'Saved sales return for sharing',
+      toast:'Sales return saved. Share options opened'
+    });
+    if(inv)openInvoiceShareModal(inv);
+    return;
+  }
   const inv=saveDraftInvoice({
     showRegister:false,
     auditAction:'Saved sales invoice for sharing',
@@ -4952,7 +5735,8 @@ function openDraftInvoiceShare(){
 
 function invoiceShareMessage(inv=currentSalesInvoice){
   const total=Number(inv?.total||0).toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2});
-  return `Dear ${inv?.customer||'Customer'}, please find invoice ${inv?.invoice_no||'Draft'} for AED ${total}. Due date: ${inv?.due_date||'-'}.\n\nView invoice online: ${publicInvoiceUrl(inv)}\nPDF invoice: please attach the PDF opened from TaxFlow.`;
+  const label=isSalesReturn(inv)?'sales return':'invoice';
+  return `Dear ${inv?.customer||'Customer'}, please find ${label} ${inv?.invoice_no||'Draft'} for AED ${total}. Due date: ${inv?.due_date||'-'}.\n\nView document online: ${publicInvoiceUrl(inv)}\nPDF document: please attach the PDF opened from TaxFlow.`;
 }
 
 function openInvoiceShareModal(inv=currentSalesInvoice){
@@ -4973,9 +5757,10 @@ function openInvoiceShareModal(inv=currentSalesInvoice){
 function shareCurrentInvoice(channel){
   const inv=currentSalesInvoice||buildDraftInvoice();
   const msg=document.getElementById('share-message')?.value||invoiceShareMessage(inv);
+  const docLabel=isSalesReturn(inv)?'Sales Return':'Invoice';
   if(channel==='email'){
     const email=document.getElementById('share-email')?.value||'';
-    const subject=encodeURIComponent(`Invoice ${inv.invoice_no||'Draft'} from ${getInvoiceLayout().company}`);
+    const subject=encodeURIComponent(`${docLabel} ${inv.invoice_no||'Draft'} from ${getInvoiceLayout().company}`);
     const body=encodeURIComponent(msg);
     window.open(`mailto:${encodeURIComponent(email)}?subject=${subject}&body=${body}`,'_blank');
     toast(`Email opened with PDF note and online invoice link`, 'ok');
@@ -5431,25 +6216,34 @@ async function extractSingleFile(entry){
 
 function isExtractionErrorResult(invoices){
   return Array.isArray(invoices)&&invoices.length>0&&invoices.every(inv=>
-    String(inv?.status||'').toLowerCase()==='error'&&
-    Number(inv?.confidence||0)<=0&&
-    (!Array.isArray(inv?.lines)||inv.lines.length===0)
+    isPurchaseExtractionError(inv)
   );
 }
 
 async function appendExtractedRows(invoices,filename){
   const tbody=document.getElementById('ext-tbody');
   if(!tbody)return;
-  if(tbody.querySelector('td[colspan]'))tbody.innerHTML='';
+  if(tbody.querySelector('.ai-empty-state,[data-extraction-error]'))tbody.innerHTML='';
   if(!Array.isArray(invoices)||!invoices.length){
-    tbody.innerHTML=`<tr><td colspan="30" style="color:var(--red);text-align:center">No data extracted from ${escapeHtml(filename||'uploaded file')}.</td></tr>`;
+    tbody.innerHTML=`<div class="ai-empty-state" style="color:var(--red)">No data extracted from ${escapeHtml(filename||'uploaded file')}.</div>`;
     return;
   }
-  const existingInvoiceNos=new Set([...tbody.querySelectorAll('tr[data-inv]')].map(row=>row.dataset.invoiceNo||'').filter(Boolean));
+  const existingInvoiceNos=new Set(purchaseAiRows(tbody).map(row=>row.dataset.invoiceNo||'').filter(Boolean));
   let fragment=document.createDocumentFragment();
   let appended=0;
   const previewInvoices=invoices.slice(0,PURCHASE_AI_PREVIEW_LIMIT);
   for(const [invoiceIndex,inv] of previewInvoices.entries()){
+    if(isPurchaseExtractionError(inv)){
+      const row=document.createElement('div');
+      row.className='ai-extract-card ai-error-card';
+      row.dataset.extractionError='1';
+      row.innerHTML=`
+        <strong>${escapeHtml(inv.invoice_no||filename||'Upload')}</strong>: ${escapeHtml(inv.issues||'No purchase invoice rows were found in the uploaded file.')}
+      `;
+      fragment.appendChild(row);
+      appended++;
+      continue;
+    }
     const invoiceNo=String(inv.invoice_no||'');
     if(existingInvoiceNos.has(invoiceNo)){
       toast(`Duplicate in current purchase AI upload: ${inv.invoice_no}`,'warn');
@@ -5458,53 +6252,17 @@ async function appendExtractedRows(invoices,filename){
     existingInvoiceNos.add(invoiceNo);
     const invoiceUid=`${Date.now()}-${invoiceIndex}-${Math.random().toString(36).slice(2,8)}`;
     const validation=validatePurchaseAiInvoice(inv);
-    const confCls=inv.confidence>=90?'b-g':inv.confidence>=70?'b-a':'b-r';
-    const stCls=validation.valid?'b-g':'b-a';
-    const fmt=n=>Number(n).toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2});
     const lines=Array.isArray(inv.lines)&&inv.lines.length?inv.lines:[{}];
     lines.forEach((line,index)=>{
-      const lineTotal=parseAmount(line.line_total||line.amount);
-      const vat=index===0?parseAmount(inv.vat_amount):0;
-      const paid=index===0?parseAmount(inv.paid):0;
-      const shipping=index===0?parseAmount(inv.shipping):0;
-      const total=index===0?parseAmount(inv.total):(lineTotal+vat);
-      const row=document.createElement('tr');
+      const row=document.createElement('div');
+      row.className='ai-extract-card';
       row.setAttribute('data-inv',JSON.stringify(inv));
+      row.draggable=true;
       row.dataset.invoiceNo=inv.invoice_no||'';
       row.dataset.invoiceUid=invoiceUid;
       row.dataset.lineIndex=String(index);
       row.dataset.validation=validation.valid?'valid':'review';
-      row.innerHTML=`
-        <td><input type="checkbox" class="purchase-ai-select" ${validation.valid?'checked':''} aria-label="Select ${escapeHtml(inv.invoice_no)} line ${index+1}"></td>
-        <td class="purchase-ai-details" style="color:var(--text3);font-size:12px">${escapeHtml(index===0?(validation.issues.join('; ')||purchaseAiRawDetails(line)||'Ready to save'):'')}</td>
-        <td data-action-col="1">${index===0?purchaseAiUploadActionsHtml():''}</td>
-        <td class="mono">${escapeHtml(inv.invoice_no)}</td>
-        <td>${escapeHtml(inv.date||'')}</td>
-        <td>${escapeHtml(inv.supplier||'')}</td>
-        <td>${escapeHtml(inv.address||'')}</td>
-        <td>${escapeHtml(inv.pay_term||'')}</td>
-        <td>${escapeHtml(purchaseAiProductName(line))}</td>
-        <td class="mono">${fmt(line.quantity||line.qty||0)}</td>
-        <td>${escapeHtml(line.unit||line.unit_of_measure||line.uom||'PCS')}</td>
-        <td class="mono">${fmt(line.unit_cost||line.cost||line.unitCost||0)}</td>
-        <td class="mono">${fmt(line.discount_percent||line.discountPct||0)}</td>
-        <td class="mono">${fmt(line.unit_cost_before_tax||line.unit_cost||line.cost||0)}</td>
-        <td class="mono">${fmt(line.line_total||line.amount||0)}</td>
-        <td class="mono">${fmt(line.profit_margin||line.margin||0)}</td>
-        <td class="mono">${fmt(line.selling_price_inc_tax||line.selling_price||0)}</td>
-        <td>${escapeHtml(inv.discount_type||'None')}</td>
-        <td class="mono">${fmt(inv.discount_value||inv.discount||0)}</td>
-        <td class="mono">${fmt(vat)}</td>
-        <td>${escapeHtml(inv.shipping_details||'')}</td>
-        <td class="mono">${fmt(shipping)}</td>
-        <td class="mono">${fmt(paid)}</td>
-        <td>${escapeHtml(inv.paid_on||'')}</td>
-        <td>${escapeHtml(inv.payment_method||'Cash')}</td>
-        <td>${escapeHtml(inv.payment_account||'None')}</td>
-        <td>${escapeHtml(inv.payment_note||'')}</td>
-        <td>${escapeHtml(inv.notes||'')}</td>
-        <td class="mono">${fmt(Math.max(0,total-paid))}</td>
-        <td class="purchase-ai-validation"><span class="b ${stCls}">${validation.valid?'Valid':'Review'}</span></td>`;
+      row.innerHTML=purchaseAiRowHtml(inv,line,index,validation);
       fragment.appendChild(row);
       appended++;
     });
@@ -5516,16 +6274,143 @@ async function appendExtractedRows(invoices,filename){
   }
   if(fragment.childNodes.length)tbody.insertBefore(fragment,tbody.firstChild);
   if(invoices.length>previewInvoices.length){
-    const row=document.createElement('tr');
+    const row=document.createElement('div');
+    row.className='ai-empty-state';
     row.dataset.previewSummary='1';
-    row.innerHTML=`<td colspan="30" style="color:var(--text3);text-align:center">Showing ${previewInvoices.length.toLocaleString('en-AE')} of ${invoices.length.toLocaleString('en-AE')} extracted invoices. Save All will save the full upload.</td>`;
+    row.innerHTML=`Showing ${previewInvoices.length.toLocaleString('en-AE')} of ${invoices.length.toLocaleString('en-AE')} extracted invoices. Save All will save the full upload.`;
     tbody.appendChild(row);
   }
   revalidatePurchaseAiRows();
+  enablePurchaseAiDragDrop();
+  applyPurchaseAiSort(false);
+  ensurePurchaseAiUploadTile();
 }
 
 function yieldToBrowser(){
   return new Promise(resolve=>setTimeout(resolve,0));
+}
+
+let purchaseAiDraggedRow=null;
+
+function purchaseAiRows(scope=document){
+  const root=scope===document?document.getElementById('ext-tbody'):scope;
+  return root?[...root.querySelectorAll('[data-inv]')]:[];
+}
+
+function purchaseAiRowFromButton(btn){
+  return btn?.closest?.('[data-inv]');
+}
+
+function purchaseAiUploadTileHtml(){
+  return `<div class="ai-upload-more-tile">
+    <div class="ai-upload-more-icon">${uploadIconSvg()}</div>
+    <strong>Upload More Invoices</strong>
+    <span>Drag and drop files here or</span>
+    <button class="btn btn-p btn-sm" type="button" onclick="document.getElementById('pur-file')?.click()">Upload Files</button>
+  </div>`;
+}
+
+function ensurePurchaseAiUploadTile(){
+  const grid=document.getElementById('ext-tbody');
+  if(!grid||!purchaseAiRows(grid).length)return;
+  grid.querySelectorAll('.ai-upload-more-tile').forEach(tile=>tile.remove());
+  const holder=document.createElement('div');
+  holder.innerHTML=purchaseAiUploadTileHtml();
+  grid.appendChild(holder.firstElementChild);
+}
+
+function purchaseAiCurrentView(){
+  const grid=document.getElementById('ext-tbody');
+  return grid?.dataset.view||'grid';
+}
+
+function setPurchaseAiCardView(view='grid',btn=null){
+  const grid=document.getElementById('ext-tbody');
+  if(!grid)return;
+  const next=view==='gallery'?'gallery':'grid';
+  grid.dataset.view=next;
+  grid.classList.toggle('view-gallery',next==='gallery');
+  grid.classList.toggle('view-grid',next==='grid');
+  document.querySelectorAll('.ai-view-toggle .seg').forEach(item=>{
+    item.classList.toggle('on',item===btn||item.dataset.aiView===next);
+  });
+}
+
+function purchaseAiSortValue(row,field){
+  let inv={};
+  try{inv=JSON.parse(row.dataset.inv||'{}');}catch{}
+  const lineIndex=Number(row.dataset.lineIndex||0);
+  const line=Array.isArray(inv.lines)?(inv.lines[lineIndex]||{}):{};
+  if(field==='invoice')return String(inv.invoice_no||row.dataset.invoiceNo||'').toLowerCase();
+  if(field==='date')return Date.parse(inv.date||'')||0;
+  if(field==='supplier')return String(inv.supplier||'').toLowerCase();
+  if(field==='total')return purchaseAiNumber(inv.total||line.line_total||line.amount);
+  if(field==='validation')return row.dataset.validation==='valid'?1:0;
+  return Number(row.dataset.originalIndex||0);
+}
+
+function applyPurchaseAiSort(userTriggered=false){
+  const grid=document.getElementById('ext-tbody');
+  const sort=document.getElementById('purchase-ai-sort')?.value||'manual';
+  if(!grid||sort==='manual')return;
+  const direction=document.getElementById('purchase-ai-sort-dir')?.dataset.dir||'asc';
+  const rows=purchaseAiRows(grid);
+  rows.forEach((row,index)=>{
+    if(!row.dataset.originalIndex)row.dataset.originalIndex=String(index);
+  });
+  const extras=[...grid.children].filter(child=>!child.matches?.('[data-inv]'));
+  rows.sort((a,b)=>{
+    const av=purchaseAiSortValue(a,sort);
+    const bv=purchaseAiSortValue(b,sort);
+    const result=typeof av==='number'&&typeof bv==='number'
+      ? av-bv
+      : String(av).localeCompare(String(bv),undefined,{numeric:true,sensitivity:'base'});
+    return direction==='desc'?-result:result;
+  });
+  rows.forEach(row=>grid.appendChild(row));
+  extras.forEach(extra=>grid.appendChild(extra));
+  if(userTriggered)toast('AI upload cards sorted','ok');
+}
+
+function togglePurchaseAiSortDirection(){
+  const btn=document.getElementById('purchase-ai-sort-dir');
+  if(!btn)return;
+  const next=btn.dataset.dir==='desc'?'asc':'desc';
+  btn.dataset.dir=next;
+  btn.textContent=next==='asc'?'Asc':'Desc';
+  applyPurchaseAiSort(true);
+}
+
+function enablePurchaseAiDragDrop(){
+  const tbody=document.getElementById('ext-tbody');
+  if(!tbody||tbody.dataset.dragBound==='1')return;
+  tbody.dataset.dragBound='1';
+  tbody.addEventListener('dragstart',event=>{
+    const row=event.target.closest?.('[data-inv]');
+    if(!row)return;
+    purchaseAiDraggedRow=row;
+    row.classList.add('dragging');
+    event.dataTransfer.effectAllowed='move';
+    event.dataTransfer.setData('text/plain',row.dataset.invoiceUid||row.dataset.invoiceNo||'row');
+  });
+  tbody.addEventListener('dragover',event=>{
+    if(!purchaseAiDraggedRow)return;
+    const target=event.target.closest?.('[data-inv]');
+    if(!target||target===purchaseAiDraggedRow)return;
+    event.preventDefault();
+    const rect=target.getBoundingClientRect();
+    const after=(event.clientY-rect.top)>rect.height/2;
+    target.parentNode.insertBefore(purchaseAiDraggedRow,after?target.nextSibling:target);
+  });
+  tbody.addEventListener('dragend',()=>{
+    if(purchaseAiDraggedRow){
+      purchaseAiDraggedRow.classList.remove('dragging');
+      purchaseAiDraggedRow=null;
+      const sort=document.getElementById('purchase-ai-sort');
+      if(sort)sort.value='manual';
+      toast('AI rows reordered','ok');
+    }
+  });
 }
 
 function purchaseAiProductName(line={}){
@@ -5541,12 +6426,76 @@ function purchaseAiRawDetails(line={}){
   return entries.length?`Raw: ${entries.join(' | ')}`:'';
 }
 
+function purchaseAiInvoiceSummary(inv={}){
+  const lines=Array.isArray(inv.lines)?inv.lines:[];
+  const names=[...new Set(lines.map(line=>purchaseAiProductName(line)).filter(Boolean))];
+  if(!names.length)return 'No items';
+  const first=names.slice(0,2).join(', ');
+  return names.length>2?`${first} +${names.length-2}`:first;
+}
+
+function purchaseAiConfidenceBadge(inv={}){
+  const confidence=purchaseAiNumber(inv.confidence);
+  const cls=confidence>=90?'b-g':confidence>=70?'b-a':'b-r';
+  return `<span class="b ${cls}">${confidence.toFixed(0)}%</span>`;
+}
+
+function purchaseAiStatusMeta(inv={},validation={valid:false}){
+  if(!validation.valid)return {label:'Pending',cls:'pending'};
+  const total=purchaseAiNumber(inv.total);
+  const paid=purchaseAiNumber(inv.paid);
+  if(total>0&&paid>=total)return {label:'Approved',cls:'approved'};
+  if(paid>0)return {label:'Partial',cls:'partial'};
+  return {label:'Pending',cls:'pending'};
+}
+
+function purchaseAiStatusPillHtml(label='Pending',cls='pending'){
+  return `<span class="ai-status-pill ${escapeHtml(cls)}">${escapeHtml(label)}</span>`;
+}
+
+function purchaseAiRowHtml(inv,line,index,validation){
+  const fmt=n=>purchaseAiNumber(n).toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const lineTotal=purchaseAiNumber(line.line_total||line.amount);
+  const vat=purchaseAiNumber(inv.vat_amount);
+  const total=index===0?purchaseAiNumber(inv.total):(lineTotal+vat);
+  const paid=index===0?purchaseAiNumber(inv.paid):0;
+  const status=purchaseAiStatusMeta(inv,validation);
+  const details=index===0?(validation.issues.join('; ')||purchaseAiRawDetails(line)||'Ready to save'):'';
+  const product=purchaseAiProductName(line)||'Extracted purchase item';
+  return `
+    <div class="ai-card-head">
+      <div class="ai-card-title-wrap">
+        <input type="checkbox" class="purchase-ai-select" ${validation.valid?'checked':''} aria-label="Select ${escapeHtml(inv.invoice_no)} line ${index+1}">
+        <div class="ai-pdf-icon"><span>PDF</span></div>
+        <div>
+          <div class="ai-card-title mono">${escapeHtml(inv.invoice_no||'Missing invoice no')}</div>
+          <div class="ai-card-kicker">${escapeHtml(inv.supplier||'Supplier missing')}</div>
+        </div>
+      </div>
+      <div class="ai-card-head-actions">
+        <span class="purchase-ai-validation"><span class="ai-status-pill ${status.cls}" title="Confidence ${purchaseAiNumber(inv.confidence).toFixed(0)}%">${escapeHtml(status.label)}</span></span>
+      </div>
+    </div>
+    <div class="ai-invoice-divider"></div>
+    <div class="ai-invoice-fields">
+      <div><span>Invoice Date</span><strong>${escapeHtml(inv.date||'No date')}</strong></div>
+      <div><span>Invoice No</span><strong class="mono">${escapeHtml(inv.invoice_no||'Missing')}</strong></div>
+      <div><span>Supplier Name</span><strong>${escapeHtml(inv.supplier||'Supplier missing')}</strong></div>
+      <div><span>Total Due</span><strong class="mono">AED ${fmt(total)}</strong></div>
+      <div><span>Paid</span><strong class="mono ${paid>0?'paid-ok':'paid-due'}">AED ${fmt(paid)}</strong></div>
+    </div>
+    <div class="ai-card-foot">
+      <span class="purchase-ai-details">${escapeHtml(details)}</span>
+      ${index===0?purchaseAiUploadActionsHtml():''}
+    </div>`;
+}
+
 function purchaseRecordFromExtractedInvoice(inv){
-  const total=Number(inv.total||0);
+  const total=purchaseAiNumber(inv.total);
   const status=String(inv.status||'Review');
   const lines=Array.isArray(inv.lines)?inv.lines:[];
   const itemQuantity=purchaseLinesTotalQuantity(lines)||lines.length||1;
-  const paid=Number(inv.paid||0);
+  const paid=purchaseAiNumber(inv.paid);
   return {
     ref:inv.invoice_no,
     supplier:inv.supplier||'Supplier',
@@ -5555,21 +6504,21 @@ function purchaseRecordFromExtractedInvoice(inv){
     location:'Dubai HQ',
     pay_term:inv.pay_term||'',
     items:itemQuantity,
-    net_amount:Number(inv.net_amount||inv.subtotal||0),
+    net_amount:purchaseAiNumber(inv.net_amount||inv.subtotal),
     discount:discountAmountFromExtractedInvoice(inv),
-    tax_amount:Number(inv.tax_amount||inv.vat_amount||0),
-    shipping:Number(inv.shipping||0),
+    tax_amount:purchaseAiNumber(inv.tax_amount||inv.vat_amount),
+    shipping:purchaseAiNumber(inv.shipping),
     total,
     paid,
-    due:Number(inv.due??Math.max(0,total-paid)),
+    due:purchaseAiNumber(inv.due)||Math.max(0,total-paid),
     source:'AI Upload',
     status:status==='Valid'?'Received':status,
     extraction_status:status,
     supplier_trn:inv.supplier_trn||'',
     issues:inv.issues||'',
     discount_type:inv.discount_type||'None',
-    discount_value:Number(inv.discount_value||0),
-    tax_type:inv.tax_type||(Number(inv.vat_amount||0)>0?'VAT 5%':'None'),
+    discount_value:purchaseAiNumber(inv.discount_value),
+    tax_type:inv.tax_type||(purchaseAiNumber(inv.vat_amount)>0?'VAT 5%':'None'),
     lines,
     payment_method:inv.payment_method||'Cash',
     payment_account:inv.payment_account||'None',
@@ -5581,13 +6530,13 @@ function purchaseRecordFromExtractedInvoice(inv){
 }
 
 function discountAmountFromExtractedInvoice(inv){
-  const net=Number(inv.net_amount||inv.subtotal||0);
-  const value=Number(inv.discount_value||inv.discount||0);
+  const net=purchaseAiNumber(inv.net_amount||inv.subtotal);
+  const value=purchaseAiNumber(inv.discount_value||inv.discount);
   return inv.discount_type==='Percentage'?net*(value/100):inv.discount_type==='Fixed'?value:0;
 }
 
 async function storeExtractedPurchaseRecords(){
-  const rows=[...document.querySelectorAll('#ext-tbody tr[data-inv]')];
+  const rows=purchaseAiRows();
   const visibleInvoiceNos=new Set(rows.map(row=>String(row.dataset.invoiceNo||'')));
   const skippedOrUnchecked=new Set(rows
     .filter(row=>row.dataset.skipped==='1'||!row.querySelector('.purchase-ai-select')?.checked)
@@ -5807,13 +6756,14 @@ function markExtractedInvoicesUploaded(invoiceNos){
 
 function markPurchaseAiInvoicesBulk(updates){
   const updateMap=new Map((updates||[]).map(item=>[String(item.invoiceNo||''),item]));
-  document.querySelectorAll('#ext-tbody tr[data-inv]').forEach(row=>{
+  purchaseAiRows().forEach(row=>{
     const update=updateMap.get(String(row.dataset.invoiceNo||''));
     if(!update)return;
-    const cls=update.status==='Saved'?'b-g':update.status==='Updated'?'b-g':update.status==='Review'?'b-a':'b-gray';
+    const pillCls=update.status==='Saved'||update.status==='Updated'?'approved':update.status==='Review'?'partial':'pending';
+    const pillLabel=update.status==='Saved'||update.status==='Updated'?'Approved':update.status;
     const validationCell=row.querySelector('.purchase-ai-validation');
     const detailsCell=row.querySelector('.purchase-ai-details');
-    if(validationCell)validationCell.innerHTML=`<span class="b ${cls}">${escapeHtml(update.status)}</span>`;
+    if(validationCell)validationCell.innerHTML=purchaseAiStatusPillHtml(pillLabel,pillCls);
     if(detailsCell&&Number(row.dataset.lineIndex||0)===0)detailsCell.textContent=update.details||update.status;
     if(update.skip){
       row.dataset.skipped='1';
@@ -5850,7 +6800,7 @@ function purchaseRecordsEquivalent(a,b){
 }
 
 function normalizePurchaseRecordForCompare(record={}){
-  const normNumber=value=>Number(value||0).toFixed(2);
+  const normNumber=value=>parseAmount(value).toFixed(2);
   const normText=value=>String(value||'').trim().toLowerCase();
   const lines=Array.isArray(record.lines)?record.lines:[];
   return {
@@ -5891,10 +6841,10 @@ function normalizePurchaseRecordForCompare(record={}){
 }
 
 function markPurchaseAiInvoiceRows(invoiceNo,status,details,skip=false){
-  document.querySelectorAll('#ext-tbody tr[data-inv]').forEach(row=>{
+  purchaseAiRows().forEach(row=>{
     if((row.dataset.invoiceNo||'')!==String(invoiceNo||''))return;
-    const cls=status==='Saved'?'b-g':status==='Review'?'b-a':'b-gray';
-    row.querySelector('.purchase-ai-validation').innerHTML=`<span class="b ${cls}">${escapeHtml(status)}</span>`;
+    const pillCls=status==='Saved'||status==='Approved'?'approved':status==='Review'?'partial':'pending';
+    row.querySelector('.purchase-ai-validation').innerHTML=purchaseAiStatusPillHtml(status==='Saved'?'Approved':status,pillCls);
     row.querySelector('.purchase-ai-details').textContent=details||status;
     if(skip){
       row.dataset.skipped='1';
@@ -5909,11 +6859,11 @@ function validatePurchaseAiInvoice(inv,options={}){
   const invoiceNo=String(inv.invoice_no||'').trim();
   const invoiceKeyValue=invoiceKey(invoiceNo);
   const trn=String(inv.supplier_trn||'').replace(/\D/g,'');
-  const subtotal=Number(inv.subtotal||0);
-  const vat=Number(inv.vat_amount||0);
-  const total=Number(inv.total||0);
+  const subtotal=purchaseAiNumber(inv.subtotal);
+  const vat=purchaseAiNumber(inv.vat_amount);
+  const total=purchaseAiNumber(inv.total);
   const discount=discountAmountFromExtractedInvoice(inv);
-  const shipping=Number(inv.shipping||0);
+  const shipping=purchaseAiNumber(inv.shipping);
   if(!invoiceNo)issues.push('Invoice number missing');
   if(invoiceNo){
     const existsInRecords=options.existingPurchaseRefs
@@ -5930,7 +6880,7 @@ function validatePurchaseAiInvoice(inv,options={}){
   if(trn&&trn.length!==15)issues.push('Supplier TRN must be 15 digits');
   if(total&&Math.abs((Math.max(0,subtotal-discount)+vat+shipping)-total)>.05)issues.push('Total does not match subtotal - discount + VAT + shipping');
   if(String(inv.status||'').toLowerCase()==='error')issues.push(inv.issues||'Extraction returned error status');
-  if(Number(inv.confidence||0)<70)issues.push('Low confidence extraction');
+  if(purchaseAiNumber(inv.confidence)<70)issues.push('Low confidence extraction');
   return {valid:issues.length===0,issues};
 }
 
@@ -5938,7 +6888,7 @@ function countPurchaseAiInvoiceNo(invoiceNo){
   const key=invoiceKey(invoiceNo);
   if(!key)return 0;
   const invoiceUids=new Set();
-  [...document.querySelectorAll('#ext-tbody tr[data-inv]')].forEach((row,index)=>{
+  purchaseAiRows().forEach((row,index)=>{
     try{
       if(invoiceKey(JSON.parse(row.dataset.inv||'{}').invoice_no)!==key)return;
       invoiceUids.add(row.dataset.invoiceUid||`${row.dataset.invoiceNo||key}:${index}`);
@@ -5951,10 +6901,15 @@ function countPurchaseAiInvoiceNo(invoiceNo){
 
 function purchaseAiUploadActionsHtml(){
   return `<div class="row-actions">
-    <button class="icon-btn" type="button" title="Edit" aria-label="Edit purchase AI row" onclick="openPurchaseAiEdit(this)">${editIconSvg()}</button>
-    <button class="icon-btn skip" type="button" title="Skip" aria-label="Skip purchase AI row" onclick="skipPurchaseAiRow(this)">${skipIconSvg()}</button>
-    <button class="icon-btn danger" type="button" title="Delete" aria-label="Delete purchase AI row" onclick="deletePurchaseAiRow(this)">${deleteIconSvg()}</button>
+    <button class="ai-card-action view" type="button" title="View" aria-label="View purchase AI invoice" onclick="openPurchaseAiView(this)">${viewIconSvg()}<span>View</span></button>
+    <button class="ai-card-action edit" type="button" title="Edit" aria-label="Edit purchase AI row" onclick="openPurchaseAiEdit(this)">${editIconSvg()}<span>Edit</span></button>
+    <button class="ai-card-action approve" type="button" title="Approve" aria-label="Approve purchase AI row" onclick="approvePurchaseAiRow(this)">${checkIconSvg()}<span>Approve</span></button>
+    <button class="ai-card-action delete" type="button" title="Delete" aria-label="Delete purchase AI row" onclick="deletePurchaseAiRow(this)">${deleteIconSvg()}<span>Delete</span></button>
   </div>`;
+}
+
+function purchaseAiDragHandleHtml(){
+  return '<span class="ai-drag-handle" title="Drag to reorder" aria-label="Drag to reorder" draggable="true">::</span>';
 }
 
 let purchaseAiEditRow=null;
@@ -6056,7 +7011,7 @@ function ensurePurchaseAiEditModal(){
 }
 
 function openPurchaseAiEdit(btn){
-  const row=btn.closest('tr');
+  const row=purchaseAiRowFromButton(btn);
   if(!row)return;
   purchaseAiEditRow=row;
   let inv={};
@@ -6073,7 +7028,7 @@ function openPurchaseAiEdit(btn){
   lines.forEach(line=>addPurchaseAiEditLine(line));
   document.getElementById('pai-discount-type').value=inv.discount_type||'None';
   document.getElementById('pai-discount-value').value=inv.discount_value||inv.discount||0;
-  document.getElementById('pai-tax-type').value=inv.tax_type||((Number(inv.vat_amount||0)>0)?'VAT 5%':'None');
+  document.getElementById('pai-tax-type').value=inv.tax_type||((purchaseAiNumber(inv.vat_amount)>0)?'VAT 5%':'None');
   document.getElementById('pai-vat').value=inv.vat_amount||0;
   document.getElementById('pai-shipping-details').value=inv.shipping_details||'';
   document.getElementById('pai-shipping').value=inv.shipping||0;
@@ -6091,6 +7046,22 @@ function openPurchaseAiEdit(btn){
   document.getElementById('pai-edit-sub').textContent=`${inv.invoice_no||'Purchase'} - ${lines.length} line(s)`;
   calcPurchaseAiEditInvoice();
   showM('m-purchase-ai-edit');
+}
+
+function openPurchaseAiView(btn){
+  const row=purchaseAiRowFromButton(btn);
+  if(!row)return;
+  let inv={};
+  try{inv=JSON.parse(row.dataset.inv||'{}');}catch{return;}
+  renderPurchaseRecordPreview({
+    ...inv,
+    ref:inv.invoice_no,
+    tax_amount:inv.vat_amount,
+    net_amount:inv.subtotal,
+    source:inv.source||'AI Upload',
+    status:validatePurchaseAiInvoice(inv).valid?'Valid':'Review'
+  });
+  showM('m-purchase-view');
 }
 
 function addPurchaseAiEditLine(line={}){
@@ -6233,7 +7204,7 @@ function savePurchaseAiEdit(next=false){
   const current=purchaseAiEditRow;
   closeM('m-purchase-ai-edit');
   if(next){
-    const nextRow=[...document.querySelectorAll('#ext-tbody tr[data-inv]')]
+    const nextRow=purchaseAiRows()
       .find(row=>row.dataset.skipped!=='1'&&row!==current);
     if(nextRow)setTimeout(()=>openPurchaseAiEdit(nextRow.querySelector('.row-actions .icon-btn')),80);
   }
@@ -6251,138 +7222,96 @@ function updateUploadedPurchaseInvoice(oldInvoiceNo,inv){
 function replacePurchaseAiInvoiceRows(oldInvoiceNo,inv,invoiceUid){
   const tbody=document.getElementById('ext-tbody');
   if(!tbody)return;
-  const oldRows=[...tbody.querySelectorAll('#ext-tbody tr[data-inv]')]
+  const oldRows=purchaseAiRows(tbody)
     .filter(row=>(row.dataset.invoiceNo||'')===String(oldInvoiceNo||''));
   const anchor=oldRows[0]||purchaseAiEditRow;
   const rows=buildPurchaseAiInvoiceRows(inv,invoiceUid);
   rows.forEach(row=>tbody.insertBefore(row,anchor));
   oldRows.forEach(row=>row.remove());
   purchaseAiEditRow=rows[0]||null;
+  enablePurchaseAiDragDrop();
+  applyPurchaseAiSort(false);
 }
 
 function buildPurchaseAiInvoiceRows(inv,invoiceUid){
   const validation=validatePurchaseAiInvoice(inv);
-  const stCls=validation.valid?'b-g':'b-a';
-  const fmt=n=>Number(n||0).toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2});
   const lines=Array.isArray(inv.lines)&&inv.lines.length?inv.lines:[{}];
   return lines.map((line,index)=>{
-    const lineTotal=parseAmount(line.line_total||line.amount);
-    const vat=index===0?parseAmount(inv.vat_amount||inv.tax_amount):0;
-    const paid=index===0?parseAmount(inv.paid):0;
-    const shipping=index===0?parseAmount(inv.shipping):0;
-    const total=index===0?parseAmount(inv.total):(lineTotal+vat);
-    const row=document.createElement('tr');
+    const row=document.createElement('div');
+    row.className='ai-extract-card';
     row.setAttribute('data-inv',JSON.stringify(inv));
+    row.draggable=true;
     row.dataset.invoiceNo=inv.invoice_no||'';
     row.dataset.invoiceUid=invoiceUid||`${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
     row.dataset.lineIndex=String(index);
     row.dataset.validation=validation.valid?'valid':'review';
-    row.innerHTML=`
-      <td><input type="checkbox" class="purchase-ai-select" ${validation.valid?'checked':''} aria-label="Select ${escapeHtml(inv.invoice_no)} line ${index+1}"></td>
-      <td class="purchase-ai-details" style="color:var(--text3);font-size:12px">${escapeHtml(index===0?(validation.issues.join('; ')||purchaseAiRawDetails(line)||'Ready to save'):'')}</td>
-      <td data-action-col="1">${index===0?purchaseAiUploadActionsHtml():''}</td>
-      <td class="mono">${escapeHtml(inv.invoice_no)}</td>
-      <td>${escapeHtml(inv.date||'')}</td>
-      <td>${escapeHtml(inv.supplier||'')}</td>
-      <td>${escapeHtml(inv.address||'')}</td>
-      <td>${escapeHtml(inv.pay_term||'')}</td>
-      <td>${escapeHtml(purchaseAiProductName(line))}</td>
-      <td class="mono">${fmt(line.quantity||line.qty||0)}</td>
-      <td>${escapeHtml(line.unit||line.unit_of_measure||line.uom||'PCS')}</td>
-      <td class="mono">${fmt(line.unit_cost||line.cost||line.unitCost||0)}</td>
-      <td class="mono">${fmt(line.discount_percent||line.discountPct||0)}</td>
-      <td class="mono">${fmt(line.unit_cost_before_tax||line.unit_cost||line.cost||0)}</td>
-      <td class="mono">${fmt(line.line_total||line.amount||0)}</td>
-      <td class="mono">${fmt(line.profit_margin||line.margin||0)}</td>
-      <td class="mono">${fmt(line.selling_price_inc_tax||line.selling_price||0)}</td>
-      <td>${escapeHtml(inv.discount_type||'None')}</td>
-      <td class="mono">${fmt(inv.discount_value||inv.discount||0)}</td>
-      <td class="mono">${fmt(vat)}</td>
-      <td>${escapeHtml(inv.shipping_details||'')}</td>
-      <td class="mono">${fmt(shipping)}</td>
-      <td class="mono">${fmt(paid)}</td>
-      <td>${escapeHtml(inv.paid_on||'')}</td>
-      <td>${escapeHtml(inv.payment_method||'Cash')}</td>
-      <td>${escapeHtml(inv.payment_account||'None')}</td>
-      <td>${escapeHtml(inv.payment_note||'')}</td>
-      <td>${escapeHtml(inv.notes||'')}</td>
-      <td class="mono">${fmt(Math.max(0,total-paid))}</td>
-      <td class="purchase-ai-validation"><span class="b ${stCls}">${validation.valid?'Valid':'Review'}</span></td>`;
+    row.innerHTML=purchaseAiRowHtml(inv,line,index,validation);
     return row;
   });
 }
 
 function updatePurchaseAiInvoiceRows(oldInvoiceNo,inv){
-  const fmt=n=>Number(n||0).toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2});
   const validation=validatePurchaseAiInvoice(inv);
-  const stCls=validation.valid?'b-g':'b-a';
-  document.querySelectorAll('#ext-tbody tr[data-inv]').forEach(row=>{
+  purchaseAiRows().forEach(row=>{
     if((row.dataset.invoiceNo||'')!==String(oldInvoiceNo||''))return;
     const index=Number(row.dataset.lineIndex||0);
     const line=Array.isArray(inv.lines)?(inv.lines[index]||{}):{};
-    const lineTotal=parseAmount(line.line_total||line.amount);
-    const vat=index===0?parseAmount(inv.vat_amount||inv.tax_amount):0;
-    const paid=index===0?parseAmount(inv.paid):0;
-    const shipping=index===0?parseAmount(inv.shipping):0;
-    const total=index===0?parseAmount(inv.total):(lineTotal+vat);
     row.dataset.invoiceNo=inv.invoice_no||'';
     row.dataset.inv=JSON.stringify(inv);
     row.dataset.validation=validation.valid?'valid':'review';
-    const cells=row.children;
-    cells[1].textContent=index===0?(validation.issues.join('; ')||purchaseAiRawDetails(line)||'Ready to save'):'';
-    cells[3].textContent=inv.invoice_no||'';
-    cells[4].textContent=inv.date||'';
-    cells[5].textContent=inv.supplier||'';
-    cells[6].textContent=inv.address||'';
-    cells[7].textContent=inv.pay_term||'';
-    cells[8].textContent=purchaseAiProductName(line);
-    cells[9].textContent=fmt(line.quantity||line.qty);
-    cells[10].textContent=line.unit||line.unit_of_measure||line.uom||'PCS';
-    cells[11].textContent=fmt(line.unit_cost||line.cost||line.unitCost);
-    cells[12].textContent=fmt(line.discount_percent||line.discountPct);
-    cells[13].textContent=fmt(line.unit_cost_before_tax||line.unit_cost||line.cost);
-    cells[14].textContent=fmt(line.line_total||line.amount);
-    cells[15].textContent=fmt(line.profit_margin||line.margin);
-    cells[16].textContent=fmt(line.selling_price_inc_tax||line.selling_price);
-    cells[17].textContent=inv.discount_type||'None';
-    cells[18].textContent=fmt(inv.discount_value||inv.discount);
-    cells[19].textContent=fmt(vat);
-    cells[20].textContent=inv.shipping_details||'';
-    cells[21].textContent=fmt(shipping);
-    cells[22].textContent=fmt(paid);
-    cells[23].textContent=inv.paid_on||'';
-    cells[24].textContent=inv.payment_method||'Cash';
-    cells[25].textContent=inv.payment_account||'None';
-    cells[26].textContent=inv.payment_note||'';
-    cells[27].textContent=inv.notes||'';
-    cells[28].textContent=fmt(Math.max(0,total-paid));
-    cells[29].innerHTML=`<span class="b ${stCls}">${validation.valid?'Valid':'Review'}</span>`;
+    row.innerHTML=purchaseAiRowHtml(inv,line,index,validation);
   });
+  enablePurchaseAiDragDrop();
+  applyPurchaseAiSort(false);
 }
 
 function togglePurchaseAiSelection(checked){
-  document.querySelectorAll('#ext-tbody tr[data-inv]').forEach(row=>{
+  purchaseAiRows().forEach(row=>{
     const box=row.querySelector('.purchase-ai-select');
     if(box&&row.dataset.skipped!=='1')box.checked=checked;
   });
 }
 
 function skipPurchaseAiRow(btn){
-  const row=btn.closest('tr');
+  const row=purchaseAiRowFromButton(btn);
   if(!row)return;
   markPurchaseAiInvoiceRows(row.dataset.invoiceNo,'Skipped','Skipped by user',true);
   toast('Purchase AI row skipped','info');
 }
 
+function approvePurchaseAiRow(btn){
+  const row=purchaseAiRowFromButton(btn);
+  if(!row)return;
+  let inv={};
+  try{inv=JSON.parse(row.dataset.inv||'{}');}catch{return;}
+  const validation=validatePurchaseAiInvoice(inv);
+  if(!validation.valid){
+    toast(validation.issues.join('; ')||'Fix validation issues before approving','warn');
+    return;
+  }
+  purchaseAiRows().forEach(item=>{
+    if((item.dataset.invoiceNo||'')!==String(row.dataset.invoiceNo||''))return;
+    const box=item.querySelector('.purchase-ai-select');
+    if(box)box.checked=true;
+    const validationCell=item.querySelector('.purchase-ai-validation');
+    const detailsCell=item.querySelector('.purchase-ai-details');
+    if(validationCell)validationCell.innerHTML='<span class="ai-status-pill approved">Approved</span>';
+    if(detailsCell)detailsCell.textContent='Approved for saving';
+  });
+  toast('Invoice approved for saving','ok');
+}
+
 function deletePurchaseAiRow(btn){
-  const row=btn.closest('tr');
+  const row=purchaseAiRowFromButton(btn);
   const tbody=row?.parentElement;
   const invoiceNo=row?.dataset.invoiceNo||'';
-  document.querySelectorAll('#ext-tbody tr[data-inv]').forEach(item=>{
+  purchaseAiRows().forEach(item=>{
     if((item.dataset.invoiceNo||'')===invoiceNo)item.remove();
   });
-  if(tbody&&tbody.querySelectorAll('tr[data-inv]').length===0){
-    tbody.innerHTML='<tr><td colspan="30" style="color:var(--text3);text-align:center">AI uploaded purchase data will appear here for validation.</td></tr>';
+  if(tbody&&purchaseAiRows(tbody).length===0){
+    tbody.innerHTML='<div class="ai-empty-state">AI uploaded purchase data will appear here for validation.</div>';
+  }else{
+    ensurePurchaseAiUploadTile();
   }
   toast('Purchase AI row deleted','warn');
 }
@@ -6390,7 +7319,7 @@ function deletePurchaseAiRow(btn){
 function revalidatePurchaseAiRows(){
   const aiInvoiceCounts=purchaseAiInvoiceCounts();
   const existingPurchaseRefs=purchaseRecordRefSet();
-  document.querySelectorAll('#ext-tbody tr[data-inv]').forEach(row=>{
+  purchaseAiRows().forEach(row=>{
     if(row.dataset.skipped==='1')return;
     let inv={};
     try{inv=JSON.parse(row.dataset.inv||'{}');}catch{return;}
@@ -6399,7 +7328,10 @@ function revalidatePurchaseAiRows(){
     const validationCell=row.querySelector('.purchase-ai-validation');
     const detailsCell=row.querySelector('.purchase-ai-details');
     const checkbox=row.querySelector('.purchase-ai-select');
-    if(validationCell)validationCell.innerHTML=`<span class="b ${validation.valid?'b-g':'b-a'}">${validation.valid?'Valid':'Review'}</span>`;
+    if(validationCell){
+      const status=purchaseAiStatusMeta(inv,validation);
+      validationCell.innerHTML=purchaseAiStatusPillHtml(status.label,status.cls);
+    }
     const index=Number(row.dataset.lineIndex||0);
     if(detailsCell)detailsCell.textContent=index===0?(validation.issues.join('; ')||purchaseAiRawDetails(inv.lines?.[index]||{})||'Ready to save'):'';
   });
@@ -6409,6 +7341,7 @@ function purchaseAiInvoiceCounts(){
   const counts=new Map();
   uploadedFiles.forEach(file=>{
     (file.invoices||[]).forEach((inv,index)=>{
+      if(isPurchaseExtractionError(inv))return;
       const key=invoiceKey(inv.invoice_no);
       if(!key)return;
       const entry=counts.get(key)||new Set();
@@ -6419,7 +7352,7 @@ function purchaseAiInvoiceCounts(){
   if(counts.size){
     return new Map([...counts.entries()].map(([key,set])=>[key,set.size]));
   }
-  document.querySelectorAll('#ext-tbody tr[data-inv]').forEach((row,index)=>{
+  purchaseAiRows().forEach((row,index)=>{
     try{
       const inv=JSON.parse(row.dataset.inv||'{}');
       const key=invoiceKey(inv.invoice_no);
@@ -6441,9 +7374,10 @@ function purchaseRecordRefSet(){
 
 function updateExtractionStats(){
   const all=uploadedFiles.flatMap(f=>f.invoices||[]);
-  const total=all.length;
-  const review=all.filter(i=>i.status==='Review').length;
-  const errors=all.filter(i=>i.status==='Error').length;
+  const invoices=all.filter(inv=>!isPurchaseExtractionError(inv));
+  const total=invoices.length;
+  const review=invoices.filter(inv=>!validatePurchaseAiInvoice(inv).valid).length;
+  const errors=all.length-invoices.length;
   const stats=document.querySelectorAll('#page-purchase #p-extract .stat .stat-val');
   if(stats[0])stats[0].textContent=total;
   if(stats[1])stats[1].textContent=review;
@@ -6457,8 +7391,11 @@ function buildValidationPanel(invoices){
 function purchaseFileUploadStatus(file){
   const invoices=Array.isArray(file.invoices)?file.invoices:[];
   const saved=file.savedInvoiceNos instanceof Set?file.savedInvoiceNos:new Set(file.savedInvoiceNos||[]);
-  const total=invoices.length;
-  const savedCount=invoices.filter(inv=>saved.has(String(inv.invoice_no||''))).length;
+  const extractErrors=invoices.filter(isPurchaseExtractionError);
+  const extractedInvoices=invoices.filter(inv=>!isPurchaseExtractionError(inv));
+  const total=extractedInvoices.length;
+  const savedCount=extractedInvoices.filter(inv=>saved.has(String(inv.invoice_no||''))).length;
+  if(extractErrors.length)return {label:'Extraction error',tone:'red',badge:'b-r',summary:extractErrors[0].issues||'No purchase invoice rows were found'};
   if(total>0&&savedCount>=total)return {label:'Completed',tone:'green',badge:'b-g',summary:`${savedCount}/${total} invoices saved`};
   if(savedCount>0)return {label:'Partial',tone:'amber',badge:'b-a',summary:`${savedCount}/${total||savedCount} invoices saved`};
   if(file.status==='Error')return {label:'Not uploaded',tone:'red',badge:'b-r',summary:'Extraction failed, nothing saved'};
@@ -6486,7 +7423,7 @@ function renderPurchaseValidationDocumentStatus(){
   target.innerHTML=files.map(file=>{
     const status=purchaseFileUploadStatus(file);
     const invoices=Array.isArray(file.invoices)?file.invoices:[];
-    const reviewCount=invoices.filter(inv=>!validatePurchaseAiInvoice(inv).valid).length;
+    const reviewCount=invoices.filter(inv=>!isPurchaseExtractionError(inv)&&!validatePurchaseAiInvoice(inv).valid).length;
     const downloadDisabled=file.base64?'':' disabled';
     const uploadedAt=file.uploadedAt?new Date(file.uploadedAt).toLocaleString('en-AE'):'';
     return `<div style="${toneStyle[status.tone]};border-radius:10px;padding:14px 16px;margin-bottom:10px">
@@ -6920,6 +7857,28 @@ function resetManualPurchase(){
   setText('mp-form-sub','Manual supplier purchase entry with items, discounts, tax, shipping, and payment');
   setText('mp-save-btn','Save');
   setManualPurchaseDefaults();
+  configureManualPurchaseMode();
+}
+
+function startPurchaseTransaction(type='purchase'){
+  currentPurchaseTransactionType=type==='return'?'return':'purchase';
+  closeM('m-add-choice');
+  go('purchase');
+  setTimeout(()=>{
+    const tab=document.querySelector('#page-purchase .tab:nth-child(4)');
+    if(tab)stab(tab,'p-manual');
+    resetManualPurchase();
+    configureManualPurchaseMode();
+  },50);
+}
+
+function configureManualPurchaseMode(){
+  const isReturn=currentPurchaseTransactionType==='return';
+  setText('mp-form-title',isReturn?'Purchase Return':'Add Purchase');
+  setText('mp-form-sub',isReturn?'Supplier return entry for returned goods, debit notes, or purchase adjustments':'Manual supplier purchase entry with items, discounts, tax, shipping, and payment');
+  setText('mp-save-btn',isReturn?'Save Purchase Return':'Save');
+  const ref=document.getElementById('mp-ref');
+  if(ref&&!ref.value)ref.value=`${isReturn?'PRET':'PUR'}-${new Date().getFullYear()}-${String(Date.now()).slice(-5)}`;
 }
 
 async function saveManualPurchase(){
@@ -6933,6 +7892,7 @@ async function saveManualPurchase(){
   ensureManualPurchaseLine();
   const totals=calcManualPurchase();
   const status=totals.due<=0?'Paid':'Pending Payment';
+  const isReturn=currentPurchaseTransactionType==='return';
   if(!document.querySelector('#mp-lines tr')){
     ensureManualPurchaseLine();
     toast('Add at least one product','warn');
@@ -6949,13 +7909,13 @@ async function saveManualPurchase(){
     toast('Each purchase line needs product name and quantity','warn');
     return;
   }
-  const ref=(document.getElementById('mp-ref')?.value||`PUR-${Date.now()}`).trim();
+  const ref=(document.getElementById('mp-ref')?.value||`${isReturn?'PRET':'PUR'}-${Date.now()}`).trim();
   const record={
     ref,
     supplier,
     address:document.getElementById('mp-address')?.value||'',
     date:document.getElementById('mp-date')?.value||'',
-    status,
+    status:isReturn?'Return':status,
     location:'Main Store',
     pay_term:document.getElementById('mp-term')?.value||'',
     items:totals.items,
@@ -6978,7 +7938,8 @@ async function saveManualPurchase(){
     paid_on:document.getElementById('mp-paid-on')?.value||'',
     shipping_details:document.getElementById('mp-shipping-details')?.value||'',
     notes:document.getElementById('mp-notes')?.value||'',
-    source:'Manual'
+    source:isReturn?'Purchase Return':'Manual',
+    document_type:isReturn?'Purchase Return':'Purchase Invoice'
   };
   const wasEditing=Boolean(manualPurchaseEditingRef);
   if(manualPurchaseEditingRef){
@@ -6991,12 +7952,12 @@ async function saveManualPurchase(){
   const savedRecord=upsert.record;
   savedRecord.items=purchaseLinesTotalQuantity(savedRecord.lines)||savedRecord.items;
   purchaseRecordsTotal=Math.max(purchaseRecordsTotal,purchaseRecordCache.size);
-  audit(wasEditing?'Updated manual purchase':upsert.wasMerged?'Merged manual purchase':'Added manual purchase',ref,'Saved');
+  audit(wasEditing?'Updated manual purchase':isReturn?'Added purchase return':upsert.wasMerged?'Merged manual purchase':'Added manual purchase',ref,'Saved');
   saveServer('purchaseRecords',savedRecord,{throwOnError:true})
     .then(()=>{
       stockLevelsServerRefreshPaused=false;
       loadStockLevelsFromServer();
-      toast(wasEditing?'Purchase updated in database':upsert.wasMerged?`Purchase merged: ${upsert.mergedSameProduct} same product updated, ${upsert.addedProducts} new product line(s)`:'Purchase saved to database','ok');
+      toast(wasEditing?'Purchase updated in database':isReturn?'Purchase return saved to database':upsert.wasMerged?`Purchase merged: ${upsert.mergedSameProduct} same product updated, ${upsert.addedProducts} new product line(s)`:'Purchase saved to database','ok');
     })
     .catch(()=>{
       stockLevelsServerRefreshPaused=false;
@@ -7314,6 +8275,9 @@ function calcLine(inp){
     const price=parseAmount(row?.querySelector('.inv-price')?.value);
     const amount=row?.querySelector('.inv-amount');
     if(amount)amount.value=(qty*price).toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2});
+    if(row&&inp.classList?.contains('inv-price')){
+      row.dataset.priceSnapshot=String(price);
+    }
   }
   let sub=0;
   document.querySelectorAll('#inv-lines .inv-item').forEach(r=>{
@@ -7374,8 +8338,14 @@ function invoiceProductRecords(){
       name,
       aliases:[productName,mappedName],
       unit:itemRow?.children[4]?.textContent.trim()||'PCS',
-      price:Number(row.dataset.priceOuter||0),
-      mapped:true
+      price:Number(row.dataset.priceOuter||row.dataset.incVat||0),
+      sourcePrice:Number(row.dataset.priceOuter||row.dataset.incVat||0),
+      source:'Inventory Mapping',
+      mapped:true,
+      mappingId:row.dataset.mappingId||'',
+      taxRate:Number(row.dataset.taxRate||5),
+      cost:Number(row.dataset.cost||0),
+      markupPercent:Number(row.dataset.markupPercent||0)
     },true);
   });
   return records;
@@ -7399,6 +8369,18 @@ function applyInvoiceProductSuggestion(input){
   const price=row?.querySelector('.inv-price');
   if(unit)unit.value=match.unit||'PCS';
   if(price)price.value=Number(match.price||0).toFixed(2);
+  if(row){
+    row.dataset.productCode=match.code||'';
+    row.dataset.productName=match.name||input.value||'';
+    row.dataset.priceSource=match.source||'Item Master';
+    row.dataset.priceSnapshot=String(Number(match.price||0));
+    row.dataset.sourcePrice=String(Number(match.sourcePrice??match.price??0));
+    row.dataset.mappingId=match.mappingId||'';
+    row.dataset.mapped=match.mapped?'true':'false';
+    row.dataset.taxRate=String(Number(match.taxRate||5));
+    row.dataset.mappingCost=String(Number(match.cost||0));
+    row.dataset.markupPercent=String(Number(match.markupPercent||0));
+  }
   calcLine(price||input);
 }
 
@@ -8113,7 +9095,272 @@ function rejectCorrection(btn){
   audit('Attendance correction rejected','HR Attendance','Rejected');
 }
 
+function rotaBadge(status){
+  const text=String(status||'Draft');
+  const lower=text.toLowerCase();
+  const cls=lower.includes('publish')||lower.includes('approved')||lower.includes('active')?'b-g':lower.includes('reject')||lower.includes('conflict')?'b-r':lower.includes('pending')||lower.includes('review')?'b-a':lower.includes('inactive')||lower.includes('system')?'b-gray':'b-b';
+  return `<span class="b ${cls}">${escapeHtml(text)}</span>`;
+}
+
+function shiftHours(start,end,breakMinutes=0){
+  if(!start||!end)return '0 hrs';
+  const [sh,sm]=String(start).split(':').map(Number);
+  const [eh,em]=String(end).split(':').map(Number);
+  if([sh,sm,eh,em].some(Number.isNaN))return '0 hrs';
+  let minutes=(eh*60+em)-(sh*60+sm);
+  if(minutes<0)minutes+=24*60;
+  minutes=Math.max(0,minutes-Number(breakMinutes||0));
+  const hours=minutes/60;
+  return `${Number.isInteger(hours)?hours:hours.toFixed(2)} hrs`;
+}
+
+let activeRotaCell=null;
+
+const ROTA_EDIT_DEFAULTS={
+  Morning:{code:'M',start:'09:00',end:'18:00',mark:'Shift',className:'approved',icon:'✓'},
+  Evening:{code:'E',start:'14:00',end:'22:00',mark:'Shift',className:'approved',icon:'✓'},
+  Night:{code:'N',start:'21:00',end:'06:00',mark:'Shift',className:'night',icon:'✓'},
+  Off:{code:'OFF',start:'',end:'',mark:'Off',className:'off',icon:'•'},
+  Leave:{code:'L',start:'',end:'',mark:'Leave',className:'draft',icon:'○'},
+  Overtime:{code:'OT',start:'18:00',end:'20:00',mark:'OT',className:'overtime',icon:'!'}
+};
+
+function rotaCellTypeFromCode(code){
+  const value=String(code||'').toUpperCase();
+  return {M:'Morning',E:'Evening',N:'Night',OFF:'Off',L:'Leave',OT:'Overtime'}[value]||'Morning';
+}
+
+function openRotaCellEditor(cell){
+  activeRotaCell=cell;
+  const row=cell.closest('tr');
+  const table=cell.closest('table');
+  const cellIndex=[...row.children].indexOf(cell);
+  const day=table?.querySelector(`thead th:nth-child(${cellIndex+1})`)?.textContent.trim()||'Shift';
+  const employee=row?.children?.[0]?.textContent.trim()||'Employee';
+  const rota=cell.querySelector('.rota-cell');
+  const code=rota?.querySelector('strong')?.textContent.trim()||'M';
+  const time=rota?.querySelector('span')?.textContent.trim()||'09:00-18:00';
+  const [start='',end='']=time.includes('-')?time.split('-').map(part=>part.trim()):['',''];
+  const type=rotaCellTypeFromCode(code);
+  setText('rota-edit-sub',`${employee} - ${day}`);
+  setSelectValue(document.getElementById('rota-edit-type'),type);
+  setFieldValue(document.getElementById('rota-edit-start'),start&&start!=='-'?start:'');
+  setFieldValue(document.getElementById('rota-edit-end'),end&&end!=='-'?end:'');
+  setFieldValue(document.getElementById('rota-edit-break'),'60');
+  setSelectValue(document.getElementById('rota-edit-mark'),ROTA_EDIT_DEFAULTS[type]?.mark||'Shift');
+  setFieldValue(document.getElementById('rota-edit-notes'),'');
+  showM('m-edit-shift');
+}
+
+function applyRotaEditTypeDefaults(){
+  const type=document.getElementById('rota-edit-type')?.value||'Morning';
+  const defaults=ROTA_EDIT_DEFAULTS[type]||ROTA_EDIT_DEFAULTS.Morning;
+  setFieldValue(document.getElementById('rota-edit-start'),defaults.start);
+  setFieldValue(document.getElementById('rota-edit-end'),defaults.end);
+  setSelectValue(document.getElementById('rota-edit-mark'),defaults.mark);
+}
+
+function saveRotaCellShift(){
+  if(!activeRotaCell){
+    toast('Select a rota cell first','warn');
+    return;
+  }
+  const type=document.getElementById('rota-edit-type')?.value||'Morning';
+  const defaults=ROTA_EDIT_DEFAULTS[type]||ROTA_EDIT_DEFAULTS.Morning;
+  const start=document.getElementById('rota-edit-start')?.value||'';
+  const end=document.getElementById('rota-edit-end')?.value||'';
+  const mark=document.getElementById('rota-edit-mark')?.value||defaults.mark;
+  const className=mark==='Off'?'off':mark==='Leave'?'draft':mark==='OT'?'overtime':defaults.className;
+  const code=mark==='Off'?'OFF':mark==='Leave'?'L':mark==='OT'?'OT':defaults.code;
+  const time=(start&&end)?`${start}-${end}`:'-';
+  const icon=className==='overtime'||className==='conflict'?'!':className==='off'?'•':className==='draft'?'○':'✓';
+  activeRotaCell.innerHTML=`<div class="rota-cell ${className}"><strong>${escapeHtml(code)}</strong><span>${escapeHtml(time)}</span><em>${escapeHtml(icon)}</em></div>`;
+  activeRotaCell.dataset.rotaNote=document.getElementById('rota-edit-notes')?.value||'';
+  closeM('m-edit-shift');
+  updateRotaStats();
+  toast('Shift updated','ok');
+  audit('Updated rota cell',`${code} ${time}`,'Saved');
+}
+
+function removeRotaCellShift(){
+  if(!activeRotaCell){
+    closeM('m-edit-shift');
+    return;
+  }
+  activeRotaCell.innerHTML='<div class="rota-cell off"><strong>OFF</strong><span>-</span><em>•</em></div>';
+  closeM('m-edit-shift');
+  updateRotaStats();
+  toast('Shift removed','warn');
+  audit('Removed rota cell','Weekly rota','Deleted');
+}
+
+const DEFAULT_ROTA_SHIFTS=[
+  {id:'MOR',name:'Morning Shift',code:'MOR',start:'09:00',end:'18:00',break_minutes:60,grace:'10 minutes',ot_after:'8 hours',status:'Active'},
+  {id:'EVE',name:'Evening Shift',code:'EVE',start:'14:00',end:'22:00',break_minutes:30,grace:'10 minutes',ot_after:'8 hours',status:'Active'},
+  {id:'NIG',name:'Night Shift',code:'NIG',start:'21:00',end:'06:00',break_minutes:60,grace:'15 minutes',ot_after:'8 hours',status:'Active'},
+  {id:'OFF',name:'Off Day',code:'OFF',start:'',end:'',break_minutes:0,grace:'-',ot_after:'-',status:'Active'}
+];
+
+function seedDefaultRotaShifts(){
+  const tbody=document.getElementById('rota-shift-tbody');
+  if(!tbody)return;
+  const hasRows=[...tbody.querySelectorAll('tr:not([data-empty-state])')].length>0;
+  if(hasRows)return;
+  DEFAULT_ROTA_SHIFTS.forEach(shift=>renderRotaShiftRecord(shift,{prepend:false}));
+  updateRotaStats();
+}
+
+function renderRotaShiftRecord(shift){
+  const options=arguments[1]||{};
+  const tbody=document.getElementById('rota-shift-tbody');
+  const code=String(shift?.code||shift?.shift_code||'').trim();
+  if(!tbody||!code)return;
+  const duplicate=[...tbody.querySelectorAll('tr:not([data-empty-state])')]
+    .some(row=>(row.children[1]?.textContent||'').trim().toLowerCase()===code.toLowerCase());
+  if(duplicate)return;
+  const start=shift.start||shift.start_time||'';
+  const end=shift.end||shift.end_time||'';
+  const breakMinutes=shift.break_minutes??shift.break??0;
+  const row=document.createElement('tr');
+  row.dataset.serverRecord='rotaShifts';
+  row.dataset.shift=JSON.stringify(shift);
+  row.innerHTML=`<td>${escapeHtml(shift.name||shift.shift_name||code)}</td><td class="mono">${escapeHtml(code)}</td><td class="mono">${escapeHtml(start||'-')}</td><td class="mono">${escapeHtml(end||'-')}</td><td>${escapeHtml(String(breakMinutes||0))}m</td><td>${escapeHtml(shift.hours||shiftHours(start,end,breakMinutes))}</td><td>${escapeHtml(shift.grace||shift.grace_period||'-')}</td><td>${escapeHtml(shift.ot_after||shift.overtime_after||'-')}</td><td>${rotaBadge(shift.status||'Active')}</td><td><button class="btn btn-g btn-sm" onclick="toast('Shift loaded from database','info')">View</button></td>`;
+  removeEmptyState(tbody);
+  if(options.prepend===false)tbody.appendChild(row);
+  else tbody.prepend(row);
+  updateRotaStats();
+}
+
+function buildShiftRecordFromForm(){
+  const name=(document.getElementById('shift-name')?.value||'').trim();
+  const code=(document.getElementById('shift-code')?.value||'').trim().toUpperCase();
+  const start=document.getElementById('shift-start')?.value||'';
+  const end=document.getElementById('shift-end')?.value||'';
+  const breakMinutes=parseAmount(document.getElementById('shift-break')?.value);
+  return {
+    id:code||`SHIFT-${Date.now()}`,
+    name,
+    code,
+    start,
+    end,
+    break_minutes:breakMinutes,
+    hours:shiftHours(start,end,breakMinutes),
+    grace:document.getElementById('shift-grace')?.value||'',
+    ot_after:document.getElementById('shift-ot-after')?.value||'',
+    status:document.getElementById('shift-status')?.value||'Active'
+  };
+}
+
+async function saveShift(){
+  const record=buildShiftRecordFromForm();
+  if(!record.name||!record.code){
+    toast('Shift name and code are required','warn');
+    return;
+  }
+  renderRotaShiftRecord(record);
+  const saved=await saveServer('rotaShifts',record,{throwOnError:true}).catch(err=>{
+    console.warn('Rota shift save failed:',err);
+    toast('Shift added on screen, but database save failed','warn');
+    return null;
+  });
+  closeM('m-shift');
+  ['shift-name','shift-code','shift-break','shift-grace','shift-ot-after'].forEach(id=>setFieldValue(document.getElementById(id),''));
+  setFieldValue(document.getElementById('shift-start'),'09:00');
+  setFieldValue(document.getElementById('shift-end'),'18:00');
+  if(saved)toast('Shift saved to database','ok');
+  audit('Saved rota shift',record.code,saved?'Saved':'Local only');
+}
+
+function renderRotaSwapRecord(swap){
+  const tbody=document.getElementById('rota-swap-tbody');
+  const id=String(swap?.id||'').trim();
+  if(!tbody||!id)return;
+  const duplicate=[...tbody.querySelectorAll('tr:not([data-empty-state])')]
+    .some(row=>{
+      try{return JSON.parse(row.dataset.swap||'{}').id===id;}catch{return false;}
+    });
+  if(duplicate)return;
+  const row=document.createElement('tr');
+  row.dataset.serverRecord='rotaSwaps';
+  row.dataset.swap=JSON.stringify(swap);
+  row.innerHTML=`<td>${escapeHtml(swap.requester||'Current user')}</td><td>${escapeHtml(swap.my_shift||'-')}</td><td>${escapeHtml(swap.swap_with||'-')}</td><td>${escapeHtml(swap.target_shift||'-')}</td><td>${rotaBadge(swap.status||'Peer Pending')}</td><td><div class="flx"><button class="btn btn-success btn-sm" onclick="approveRotaRow(this,'Swap approved')">Approve</button><button class="btn btn-danger btn-sm" onclick="rejectRotaRow(this,'Swap rejected')">Reject</button></div></td>`;
+  removeEmptyState(tbody);
+  tbody.prepend(row);
+  updateRotaStats();
+}
+
+function saveRotaSwap(){
+  const record={
+    id:'SWAP-'+Date.now(),
+    requester:'Current user',
+    my_shift:(document.getElementById('swap-my-shift')?.value||'').trim(),
+    swap_with:(document.getElementById('swap-with')?.value||'').trim(),
+    target_shift:(document.getElementById('swap-target-shift')?.value||'').trim(),
+    reason:(document.getElementById('swap-reason')?.value||'').trim(),
+    status:'Peer Pending'
+  };
+  if(!record.my_shift||!record.swap_with||!record.target_shift){
+    toast('Enter my shift, swap with, and target shift','warn');
+    return;
+  }
+  renderRotaSwapRecord(record);
+  saveServer('rotaSwaps',record);
+  closeM('m-shift-swap');
+  ['swap-my-shift','swap-with','swap-target-shift','swap-reason'].forEach(id=>setFieldValue(document.getElementById(id),''));
+  toast('Shift swap request saved to database','ok');
+  audit('Submitted shift swap',record.id,'Pending');
+}
+
+function renderRotaApprovalRecord(approval){
+  const tbody=document.getElementById('rota-approval-tbody');
+  const id=String(approval?.id||'').trim();
+  if(!tbody||!id)return;
+  const duplicate=[...tbody.querySelectorAll('tr:not([data-empty-state])')]
+    .some(row=>{
+      try{return JSON.parse(row.dataset.approval||'{}').id===id;}catch{return false;}
+    });
+  if(duplicate)return;
+  const row=document.createElement('tr');
+  row.dataset.serverRecord='rotaApprovals';
+  row.dataset.approval=JSON.stringify(approval);
+  const status=approval.status||'Pending Supervisor Review';
+  row.innerHTML=`<td>${escapeHtml(approval.department||'All')}</td><td>${escapeHtml(approval.period||'-')}</td><td>${escapeHtml(approval.supervisor||'-')}</td><td>${rotaBadge(status)}</td><td><div class="flx"><button class="btn btn-success btn-sm" onclick="approveRotaRow(this,'Rota approved')">Approve</button><button class="btn btn-danger btn-sm" onclick="rejectRotaRow(this,'Rota rejected')">Reject</button></div></td>`;
+  removeEmptyState(tbody);
+  tbody.prepend(row);
+  updateRotaStats();
+}
+
+function saveRotaDraft(status='Draft'){
+  const record={
+    id:'ROTA-'+Date.now(),
+    department:'All Departments',
+    period:new Date().toISOString().slice(0,10),
+    supervisor:'HR',
+    status
+  };
+  saveServer('rotaDrafts',record);
+  const approval={...record,id:'APP-'+Date.now(),status:status==='Draft'?'Draft':'Pending Supervisor Review'};
+  renderRotaApprovalRecord(approval);
+  saveServer('rotaApprovals',approval);
+  toast(`${status} rota saved to database`,'ok');
+  audit('Saved rota draft','Rota Planning',status);
+}
+
+function updateRotaStats(){
+  const stats=[...document.querySelectorAll('#rota-shifts .stat-val')];
+  const shifts=document.querySelectorAll('#rota-shift-tbody tr:not([data-empty-state])').length;
+  const swaps=[...document.querySelectorAll('#rota-swap-tbody tr:not([data-empty-state])')];
+  const approvals=[...document.querySelectorAll('#rota-approval-tbody tr:not([data-empty-state])')];
+  const conflicts=document.querySelectorAll('#page-rota .rota-cell.conflict,#rota-approval-tbody .b-r,#rota-swap-tbody .b-r').length;
+  const pending=swaps.filter(row=>/pending|review/i.test(row.textContent)).length+approvals.filter(row=>/pending|review/i.test(row.textContent)).length;
+  if(stats[0])stats[0].textContent=String(shifts);
+  if(stats[1])stats[1].textContent=String(new Set([...document.querySelectorAll('#employee-tbody tr:not([data-empty-state]) td:nth-child(3)')].map(td=>td.textContent.trim()).filter(Boolean)).size||0);
+  if(stats[2])stats[2].textContent=String(conflicts);
+  if(stats[3])stats[3].textContent=String(pending);
+}
+
 function publishRota(){
+  saveRotaDraft('Published');
   toast('Rota published. Employees notified and attendance timing updated','ok');
   audit('Rota published','Rota Planning','Published');
 }
@@ -8139,6 +9386,7 @@ function autoGenerateMonthlyRota(){
 }
 
 function submitRotaApproval(){
+  saveRotaDraft('Pending Supervisor Review');
   toast('Rota submitted to supervisor for approval','info');
   audit('Rota submitted for approval','Rota Planning','Pending');
 }
@@ -8148,6 +9396,9 @@ function approveRotaRow(btn,msg='Rota approved'){
   const statusCell=row.querySelector('td:nth-last-child(2)');
   if(statusCell)statusCell.innerHTML='<span class="b b-g">Approved</span>';
   row.querySelector('td:last-child').innerHTML='<button class="btn btn-g btn-sm">View</button>';
+  const payload=row.dataset.swap?JSON.parse(row.dataset.swap||'{}'):JSON.parse(row.dataset.approval||'{}');
+  if(payload.id)saveServer(row.dataset.swap?'rotaSwaps':'rotaApprovals',{...payload,status:'Approved'});
+  updateRotaStats();
   toast(msg+' ?','ok');
   audit(msg,'Rota Planning','Approved');
 }
@@ -8157,6 +9408,9 @@ function rejectRotaRow(btn,msg='Rota rejected'){
   const statusCell=row.querySelector('td:nth-last-child(2)');
   if(statusCell)statusCell.innerHTML='<span class="b b-r">Rejected</span>';
   row.querySelector('td:last-child').innerHTML='<button class="btn btn-g btn-sm">View</button>';
+  const payload=row.dataset.swap?JSON.parse(row.dataset.swap||'{}'):JSON.parse(row.dataset.approval||'{}');
+  if(payload.id)saveServer(row.dataset.swap?'rotaSwaps':'rotaApprovals',{...payload,status:'Rejected'});
+  updateRotaStats();
   toast(msg,'warn');
   audit(msg,'Rota Planning','Rejected');
 }
@@ -8718,7 +9972,7 @@ function buildSystemAIResponse(question){
     return 'Documents is the repository for invoice PDFs, receipt images, bill attachments, contracts, audit packs, and VAT evidence. In production these files should move to S3 or Azure Blob Storage with encrypted retention policies.';
   }
   if(q.includes('account')||q.includes('journal')||q.includes('ledger')||q.includes('debit')||q.includes('credit')){
-    return 'Accounting now includes Chart of Accounts, Journal Entry, and General Ledger. Journal entries require date, reference, description, at least two valid lines, selected accounts, and balanced debit/credit totals before posting. Posted journals appear in the ledger, and account View filters ledger entries.';
+    return 'Accounting includes Chart of Accounts, Voucher Type, General Ledger, Payments / Receipts, Statutory Filing, and Bank Reconciliation. Voucher entries require date, voucher number, narration, at least two valid lines, selected accounts, and balanced debit/credit totals before posting.';
   }
   if(q.includes('payroll')||q.includes('wps')||q.includes('payslip')||q.includes('salary')){
     return 'Payroll includes salary calculation, WPS/SIF validation, payslip preview, approvals, and accounting posting. Payroll journal posting creates ledger lines for gross salary expense, deductions payable, and net payroll payable.';
@@ -9033,6 +10287,14 @@ function editIconSvg(){
   return `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 11.5V13h1.5L12 5.5 10.5 4 3 11.5z"/><path d="M9.8 4.7l1.5 1.5"/><path d="M2.5 14h11"/></svg>`;
 }
 
+function checkIconSvg(){
+  return `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.3l3 3L13 4.7"/></svg>`;
+}
+
+function uploadIconSvg(){
+  return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V5"/><path d="M8 9l4-4 4 4"/><path d="M5 15v3.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>`;
+}
+
 function tableActionButtonsHtml(table){
   const collection=inferCollectionFromContext(table);
   if(collection==='salesInvoices')return salesInvoiceActionsHtml();
@@ -9126,7 +10388,7 @@ function rowDeleteBlockReason(row,table){
   if(collection==='products'){
     const code=row.children[0]?.textContent.trim();
     const name=row.children[1]?.textContent.trim();
-    if(tableHasText('#sales-invoice-tbody',name)||tableHasText('#stock-map-tbody',code)||tableHasText('#stock-map-tbody',name)){
+    if(tableHasText('#sales-invoice-tbody',name)||tableHasText('#sales-return-tbody',name)||tableHasText('#stock-map-tbody',code)||tableHasText('#stock-map-tbody',name)){
       return 'This product is linked to invoices or inventory mapping. Remove those links before deleting.';
     }
   }
@@ -9189,6 +10451,7 @@ function deleteTableRow(btn){
   const row=btn.closest('tr');
   const table=row?.closest('table');
   if(!row||!table)return;
+  if(handleInventoryDelete(btn,row,table))return;
   const reason=rowDeleteBlockReason(row,table);
   const label=rowFirstValue(row);
   if(reason){
@@ -9344,6 +10607,12 @@ function exportRowDetailPdf(){
 function deleteCurrentDetailRow(){
   if(!currentDetailRow){
     toast('No row selected to delete','warn');
+    return;
+  }
+  if(currentDetailTable&&handleInventoryDelete(null,currentDetailRow,currentDetailTable)){
+    closeM('m-row-detail');
+    currentDetailRow=null;
+    currentDetailTable=null;
     return;
   }
   const label=currentDetailRow.children[0]?.textContent.trim()||'Selected row';
@@ -9570,6 +10839,7 @@ function inferCollectionFromContext(node){
     'prod-tbody':'products',
     'customer-tbody':'customers',
     'sales-invoice-tbody':'salesInvoices',
+    'sales-return-tbody':'salesInvoices',
     'quotation-tbody':'quotations',
     'bill-tbody':'bills',
     'vendor-tbody':'vendors',
@@ -9621,8 +10891,11 @@ function buildGenericRecord(fields,values){
 }
 
 function recordFromTableRow(table,row){
-  const headers=[...table.querySelectorAll('thead th')].map(th=>th.textContent.trim());
-  const fields=[...row.children].map((cell,index)=>({
+  const headers=[...table.querySelectorAll('thead th')]
+    .filter(th=>th.dataset.inventoryBulkCol!=='1'&&th.dataset.actionCol!=='1'&&!['action','actions'].includes(th.textContent.trim().toLowerCase()))
+    .map(th=>th.textContent.trim());
+  const cells=[...row.children].filter(cell=>cell.dataset.inventoryBulkCol!=='1'&&cell.dataset.actionCol!=='1'&&!cell.querySelector('button'));
+  const fields=cells.map((cell,index)=>({
     label:headers[index]||`Field ${index+1}`,
     value:cell.textContent.trim()
   })).filter(item=>item.value&&item.value.toLowerCase()!=='view'&&item.value.toLowerCase()!=='edit');
@@ -9697,18 +10970,21 @@ function saveVendor(){
 
 function savePayment(){
   const type=document.getElementById('payment-type')?.value||'Customer Receipt';
-  const ref=(document.getElementById('payment-ref')?.value||'PMT-NEW').trim();
+  const ref=(document.getElementById('payment-ref')?.value||nextPaymentReference(type)).trim();
   const contact=(document.getElementById('payment-contact')?.value||'').trim();
+  const documentRef=(document.getElementById('payment-document')?.value||'').trim();
   const amount=parseAmount(document.getElementById('payment-amount')?.value);
   const method=document.getElementById('payment-method')?.value||'Bank Transfer';
   const date=document.getElementById('payment-date')?.value||'Today';
-  if(!contact||!amount){toast('Contact and amount are required','err');return;}
-  const row=document.createElement('tr');
-  row.innerHTML=`<td class="mono">${escapeHtml(ref)}</td><td>${escapeHtml(contact)}</td><td class="mono">Manual</td><td>${escapeHtml(method)}</td><td>${escapeHtml(date)}</td><td class="mono">${amount.toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td><span class="b b-g">Posted</span></td>`;
-  if(type==='Customer Receipt')document.getElementById('payment-in-tbody')?.prepend(row);
-  else document.getElementById('payment-out-tbody')?.prepend(row);
-  saveServer('payments',{type,ref,contact,amount,method,date});
+  if(!contact||!documentRef||!amount){toast('Contact, invoice or bill, and amount are required','err');return;}
+  const record={type,ref,contact,amount,method,date,document_ref:documentRef};
+  if(isSupplierPaymentType(type))record.bill_no=documentRef;
+  else record.invoice_no=documentRef;
+  renderPaymentRecord(record);
+  saveServer('payments',record);
   closeM('m-payment');
+  ['payment-ref','payment-contact','payment-document','payment-amount'].forEach(id=>setFieldValue(document.getElementById(id),''));
+  syncPaymentFormOptions();
   toast('Payment recorded ?','ok');
   audit('Recorded payment',ref,'Posted');
 }
@@ -10118,6 +11394,8 @@ function initApp(){
   updateQuotationLayoutPreview();
   syncProductMasterOptions();
   setManualPurchaseDefaults();
+  configureSalesFormMode();
+  configureManualPurchaseMode();
   syncCompanyFromDatabase();
   enhancePageTables('page-dashboard');
   syncDashboardFromDatabase().catch(err=>console.warn('Dashboard sync failed during init:',err));

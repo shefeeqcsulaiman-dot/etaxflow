@@ -3,10 +3,12 @@ import csv
 import html
 import io
 import json
+import os
 import shutil
 import subprocess
 import tempfile
 import re
+import urllib.request
 import zlib
 import zipfile
 from decimal import Decimal, InvalidOperation
@@ -84,6 +86,10 @@ def record_key(collection: str, record: dict[str, Any]) -> str | None:
         "creditControl": "customer_name",
         "consolidation": "subsidiary_name",
         "approvalMatrix": "module",
+        "rotaShifts": "code",
+        "rotaSwaps": "id",
+        "rotaApprovals": "id",
+        "rotaDrafts": "id",
         "app_actions": "id",
     }
     field = keys.get(collection)
@@ -602,7 +608,21 @@ def sync_sales_invoice(db: Session, current_user: User, record: dict[str, Any]) 
     invoice.vat = decimal_value(record.get("vat_amount") or record.get("vat"))
     invoice.total = decimal_value(record.get("total"))
     invoice.status = "issued" if str(record.get("status", "")).lower() in {"ready", "pending"} else str(record.get("status") or "draft").lower()
-    if not invoice.lines:
+    lines = record.get("lines") if isinstance(record.get("lines"), list) else []
+    if lines:
+        invoice.lines = []
+        for line in lines:
+            quantity = decimal_value(line.get("qty") or line.get("quantity") or 1)
+            unit_price = decimal_value(line.get("unit_price") or line.get("price_snapshot") or line.get("price"))
+            invoice.lines.append(
+                InvoiceLine(
+                    description=str(line.get("description") or line.get("product_name") or "Invoice item"),
+                    quantity=quantity if quantity > 0 else Decimal("1"),
+                    unit_price=unit_price,
+                    vat_rate=decimal_value(line.get("tax_rate") or line.get("vat_rate") or 5),
+                )
+            )
+    elif not invoice.lines:
         invoice.lines = [
             InvoiceLine(
                 description=f"Imported invoice {number}",
@@ -611,8 +631,6 @@ def sync_sales_invoice(db: Session, current_user: User, record: dict[str, Any]) 
                 vat_rate=Decimal("5"),
             )
         ]
-    else:
-        invoice.lines[0].unit_price = invoice.subtotal
 
 
 def sync_source_transaction(
@@ -696,7 +714,7 @@ def ingest_purchase_document(db: Session, current_user: User, file: dict[str, An
             rows = parse_excel_html_rows(content)
         elif ext == "pdf":
             rows = parse_pdf_purchase_rows(content)
-        elif ext in {"jpg", "jpeg", "png"}:
+        elif ext in PURCHASE_IMAGE_EXTENSIONS:
             rows = parse_image_purchase_rows(content, ext)
         else:
             return [purchase_extraction_error(name, f"Unsupported purchase upload format: .{ext or 'unknown'}")]
@@ -867,6 +885,9 @@ def parse_excel_html_rows(content: bytes) -> list[dict[str, Any]]:
 
 
 def parse_pdf_purchase_rows(content: bytes) -> list[dict[str, Any]]:
+    ai_rows = extract_purchase_rows_with_openai(content, "pdf")
+    if ai_rows:
+        return ai_rows
     text = extract_pdf_text_with_pdfplumber(content) or extract_pdf_text(content)
     if not text:
         text = extract_pdf_text_with_ocr(content)
@@ -1109,10 +1130,374 @@ def make_amazon_discount_row(match: re.Match[str]) -> dict[str, Any]:
 
 
 def parse_image_purchase_rows(content: bytes, ext: str) -> list[dict[str, Any]]:
+    ai_rows = extract_purchase_rows_with_openai(content, ext)
+    if ai_rows:
+        return ai_rows
     text = extract_image_text_with_tesseract(content, ext)
     if not text:
         return []
     return purchase_rows_from_document_text(text)
+
+
+PURCHASE_IMAGE_EXTENSIONS = {"jpg", "jpeg", "png", "bmp", "webp", "tiff", "tif"}
+OPENAI_DIRECT_IMAGE_MIME = {
+    "jpg": "image/jpeg",
+    "jpeg": "image/jpeg",
+    "png": "image/png",
+    "webp": "image/webp",
+}
+
+
+OPENAI_PURCHASE_EXTRACTION_PROMPT = """You are an invoice data extraction expert.
+
+Read this supplier purchase invoice carefully and extract all visible data.
+Return ONLY a valid JSON object. Do not include markdown, code fences, or extra text.
+
+{
+  "invoice_date": "date as written on invoice, empty string if not found",
+  "invoice_number": "invoice or tax invoice number, empty string if not found",
+  "supplier": "seller or supplier company name, empty string if not found",
+  "trn_vat": "TRN or VAT registration number of supplier, empty string if not found",
+  "bill_to": "buyer or customer name, empty string if not found",
+  "currency": "3-letter currency code e.g. AED USD EUR",
+  "subtotal_excl_vat": "subtotal before VAT / invoice total before discount as plain number, empty string if not found",
+  "total_discount": "total discount amount for the whole invoice as plain number, empty string if no discount shown",
+  "vat_amount": "total VAT amount as plain number, empty string if not found",
+  "total_payable": "final total including VAT as plain number, empty string if not found",
+  "line_items": [
+    {
+      "description": "full product or service description exactly as written",
+      "qty": "quantity as string",
+      "unit": "unit of measure if visible, otherwise empty string",
+      "unit_price": "unit price before discount as plain number, or Free for free items",
+      "discount_pct": "discount percentage as plain number e.g. 13.00, empty string if none",
+      "discount_amount": "discount amount in currency as plain number, empty string if none",
+      "line_total_excl_vat": "line total before VAT as plain number, empty string if not visible",
+      "line_total": "final line total including VAT as plain number, 0.00 for free items"
+    }
+  ]
+}
+
+Rules:
+- Extract ALL line items including free/sample items, delivery, and shipping charges.
+- total_discount is the summary-level discount shown on the invoice.
+- discount_pct is the percent column in the line items table.
+- discount_amount is the calculated discount money amount per line if shown, else empty string.
+- If only discount percent is shown and not the amount, leave discount_amount empty.
+- If only discount amount is shown and not the percent, leave discount_pct empty.
+- Numbers must be plain digits with decimal point; no currency symbols and no commas.
+- Keep product descriptions exactly as printed on the invoice.
+- Use empty string for any value not visible on the invoice.
+- Do not guess or invent values."""
+
+
+def extract_purchase_rows_with_openai(content: bytes, ext: str) -> list[dict[str, Any]]:
+    api_key = os.environ.get("OPENAI_API_KEY", "").strip()
+    if not api_key:
+        return []
+    parts = openai_purchase_content_parts(content, ext)
+    if not parts:
+        return []
+    parts.append({"type": "text", "text": OPENAI_PURCHASE_EXTRACTION_PROMPT})
+    try:
+        data = call_openai_invoice_extractor(api_key, parts)
+    except Exception:
+        return []
+    return openai_invoice_to_purchase_rows(data)
+
+
+def openai_purchase_content_parts(content: bytes, ext: str) -> list[dict[str, Any]]:
+    ext = (ext or "").lower().lstrip(".")
+    if ext in PURCHASE_IMAGE_EXTENSIONS:
+        parts = openai_image_parts_with_pillow(content, ext)
+        if parts:
+            return parts
+        mime = OPENAI_DIRECT_IMAGE_MIME.get(ext)
+        if mime:
+            return [openai_image_part(content, mime)]
+        return []
+
+    if ext == "pdf":
+        text = extract_pdf_text_with_pdfplumber(content) or extract_pdf_text(content)
+        if text and len(text.strip()) > 100:
+            return [{"type": "text", "text": f"Invoice text content:\n\n{text}"}]
+        return openai_pdf_page_image_parts(content)
+    return []
+
+
+def openai_image_part(content: bytes, mime: str = "image/png") -> dict[str, Any]:
+    encoded = base64.b64encode(content).decode("ascii")
+    return {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{encoded}", "detail": "high"}}
+
+
+def openai_image_parts_with_pillow(content: bytes, ext: str) -> list[dict[str, Any]]:
+    try:
+        from PIL import Image  # type: ignore[import-not-found]
+    except Exception:
+        return []
+    try:
+        frames: list[dict[str, Any]] = []
+        with Image.open(io.BytesIO(content)) as image:
+            while True:
+                frame = image.copy().convert("RGB")
+                output = io.BytesIO()
+                frame.save(output, format="PNG")
+                frames.append(openai_image_part(output.getvalue(), "image/png"))
+                try:
+                    image.seek(image.tell() + 1)
+                except EOFError:
+                    break
+        return frames
+    except Exception:
+        return []
+
+
+def openai_pdf_page_image_parts(content: bytes) -> list[dict[str, Any]]:
+    pdftoppm = find_pdftoppm_executable()
+    if not pdftoppm:
+        return []
+    max_pages = openai_purchase_pdf_max_pages()
+    with tempfile.TemporaryDirectory() as tmp:
+        pdf_path = Path(tmp) / "upload.pdf"
+        output_prefix = Path(tmp) / "page"
+        pdf_path.write_bytes(content)
+        command = [pdftoppm, "-png", "-r", "200", "-f", "1"]
+        if max_pages > 0:
+            command.extend(["-l", str(max_pages)])
+        command.extend([str(pdf_path), str(output_prefix)])
+        result = subprocess.run(command, capture_output=True, text=True, timeout=90, check=False)
+        if result.returncode != 0:
+            return []
+        return [openai_image_part(path.read_bytes(), "image/png") for path in sorted(Path(tmp).glob("page-*.png"))]
+
+
+def openai_purchase_pdf_max_pages() -> int:
+    try:
+        return max(0, int(os.environ.get("OPENAI_PURCHASE_PDF_MAX_PAGES", "10")))
+    except ValueError:
+        return 10
+
+
+def call_openai_invoice_extractor(api_key: str, parts: list[dict[str, Any]]) -> dict[str, Any]:
+    model = os.environ.get("OPENAI_PURCHASE_MODEL", "gpt-4o-mini").strip() or "gpt-4o-mini"
+    payload = {
+        "model": model,
+        "messages": [{"role": "user", "content": parts}],
+        "max_tokens": 4096,
+        "temperature": 0,
+    }
+    request = urllib.request.Request(
+        "https://api.openai.com/v1/chat/completions",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    with urllib.request.urlopen(request, timeout=60) as response:
+        result = json.loads(response.read().decode("utf-8"))
+    raw = str(result["choices"][0]["message"]["content"] or "").strip()
+    raw = re.sub(r"^```(?:json)?\s*", "", raw, flags=re.IGNORECASE)
+    raw = re.sub(r"\s*```$", "", raw)
+    parsed = json.loads(raw)
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def openai_invoice_to_purchase_rows(data: dict[str, Any]) -> list[dict[str, Any]]:
+    items = data.get("line_items") if isinstance(data.get("line_items"), list) else []
+    if not items:
+        return []
+
+    subtotal = decimal_value(data.get("subtotal_excl_vat"))
+    vat_total = decimal_value(data.get("vat_amount"))
+    total_payable = decimal_value(data.get("total_payable"))
+    total_discount = decimal_value(data.get("total_discount"))
+    discount_applies_to_subtotal = openai_summary_discount_applies(subtotal, total_discount, vat_total, total_payable)
+    line_nets = openai_line_net_amounts(items, subtotal, vat_total, total_payable)
+    if not any(line_nets):
+        fallback_subtotal = subtotal or max(Decimal("0"), total_payable - vat_total)
+        if fallback_subtotal:
+            line_nets = distribute_invoice_amount(fallback_subtotal, len(items))
+    net_sum = sum(line_nets, Decimal("0"))
+    rows: list[dict[str, Any]] = []
+
+    for index, item in enumerate(items):
+        if not isinstance(item, dict):
+            continue
+        product = str(item.get("description") or "").strip()
+        if not product:
+            continue
+        line_net = line_nets[index] if index < len(line_nets) else Decimal("0")
+        vat = Decimal("0")
+        if vat_total:
+            if net_sum:
+                vat = vat_total * (line_net / net_sum)
+            elif index == 0:
+                vat = vat_total
+        unit_cost = openai_unit_price(item, line_net)
+        rows.append(normalize_purchase_row({
+            "invoice_no": data.get("invoice_number") or "",
+            "date": data.get("invoice_date") or "",
+            "supplier": data.get("supplier") or "",
+            "supplier_trn": data.get("trn_vat") or "",
+            "product": product,
+            "quantity": item.get("qty") or 1,
+            "unit": item.get("unit") or "PCS",
+            "unit_cost": unit_cost,
+            "unit_price": unit_cost,
+            "cost": unit_cost,
+            "discount": item.get("discount_pct") or "",
+            "discount_type": "Fixed" if discount_applies_to_subtotal else "None",
+            "discount_value": data.get("total_discount") if discount_applies_to_subtotal else "",
+            "vat_amount": vat,
+            "line_total": line_net,
+            "amount": line_net,
+            "net_amount": line_net,
+            "subtotal": line_net,
+            "tax_type": "VAT 5%" if vat_total else "None",
+            "notes": f"AI extraction currency: {data.get('currency') or 'AED'}",
+            "raw": item,
+        }))
+    return rows
+
+
+def openai_summary_discount_applies(
+    subtotal: Decimal,
+    total_discount: Decimal,
+    vat_total: Decimal,
+    total_payable: Decimal,
+) -> bool:
+    if not subtotal or not total_discount:
+        return False
+    if not total_payable:
+        return True
+    taxable_from_total = max(Decimal("0"), total_payable - vat_total)
+    return abs((subtotal - total_discount) - taxable_from_total) <= Decimal("0.05")
+
+
+def openai_line_net_amounts(
+    items: list[Any],
+    subtotal: Decimal,
+    vat_total: Decimal,
+    total_payable: Decimal,
+) -> list[Decimal]:
+    explicit_nets = [openai_explicit_line_net_amount(item) if isinstance(item, dict) else Decimal("0") for item in items]
+    if any(explicit_nets):
+        return explicit_nets
+
+    gross_values = [openai_line_gross_amount(item) if isinstance(item, dict) else Decimal("0") for item in items]
+    gross_sum = sum(gross_values, Decimal("0"))
+    if gross_sum:
+        target_net = subtotal
+        if not target_net and total_payable and vat_total:
+            target_net = max(Decimal("0"), total_payable - vat_total)
+        if target_net:
+            return distribute_by_weight(target_net, gross_values)
+
+        if vat_total:
+            return [max(Decimal("0"), gross - (vat_total * (gross / gross_sum))) for gross in gross_values]
+        return gross_values
+
+    calculated = [openai_line_net_from_unit_price(item) if isinstance(item, dict) else Decimal("0") for item in items]
+    return calculated
+
+
+def openai_explicit_line_net_amount(item: dict[str, Any]) -> Decimal:
+    return first_decimal_value(
+        item,
+        "line_total_excl_vat",
+        "line_total_before_vat",
+        "line_total_before_tax",
+        "line_subtotal",
+        "subtotal_excl_vat",
+        "taxable_amount",
+        "taxable_value",
+        "net_amount",
+        "net_value",
+        "amount_excl_vat",
+        "amount_before_tax",
+    )
+
+
+def openai_line_gross_amount(item: dict[str, Any]) -> Decimal:
+    return first_decimal_value(
+        item,
+        "line_total",
+        "line_total_incl_vat",
+        "line_total_including_vat",
+        "total_incl_vat",
+        "amount_incl_vat",
+        "gross_amount",
+        "gross_value",
+        "total",
+        "amount",
+    )
+
+
+def openai_line_net_amount(item: dict[str, Any]) -> Decimal:
+    explicit = openai_explicit_line_net_amount(item)
+    if explicit:
+        return explicit
+    return openai_line_net_from_unit_price(item) or openai_line_gross_amount(item)
+
+
+def openai_line_net_from_unit_price(item: dict[str, Any]) -> Decimal:
+    qty = first_decimal_value(item, "qty", "quantity") or Decimal("1")
+    unit_price = first_decimal_value(item, "unit_price", "rate", "price", "unit_cost")
+    discount = first_decimal_value(item, "discount_amount", "discount_value", "discount")
+    if unit_price:
+        return max(Decimal("0"), (qty * unit_price) - discount)
+    return Decimal("0")
+
+
+def openai_unit_price(item: dict[str, Any], line_net: Decimal) -> Any:
+    raw = str(first_present_raw(item, "unit_price", "rate", "price", "unit_cost") or "").strip()
+    if raw.lower() == "free":
+        return 0
+    value = decimal_value(raw)
+    if value:
+        return value
+    qty = first_decimal_value(item, "qty", "quantity") or Decimal("1")
+    return line_net / qty if qty else line_net
+
+
+def first_present_raw(row: dict[str, Any], *keys: str) -> Any:
+    normalized = {normalize_header(key): value for key, value in row.items()}
+    for key in keys:
+        value = normalized.get(normalize_header(key))
+        if value not in (None, ""):
+            return value
+    return ""
+
+
+def first_decimal_value(row: dict[str, Any], *keys: str) -> Decimal:
+    for key in keys:
+        value = first_present_raw(row, key)
+        if value not in (None, ""):
+            parsed = decimal_value(value)
+            if parsed:
+                return parsed
+    return Decimal("0")
+
+
+def distribute_invoice_amount(amount: Decimal, count: int) -> list[Decimal]:
+    if count <= 0:
+        return []
+    share = (amount / Decimal(count)).quantize(Decimal("0.01"))
+    values = [share for _ in range(count)]
+    values[-1] = amount - sum(values[:-1], Decimal("0"))
+    return values
+
+
+def distribute_by_weight(amount: Decimal, weights: list[Decimal]) -> list[Decimal]:
+    total_weight = sum(weights, Decimal("0"))
+    if amount <= 0 or total_weight <= 0:
+        return [Decimal("0") for _ in weights]
+    values = [(amount * (weight / total_weight)).quantize(Decimal("0.01")) for weight in weights]
+    if values:
+        values[-1] = amount - sum(values[:-1], Decimal("0"))
+    return values
 
 
 def extract_image_text_with_tesseract(content: bytes, ext: str) -> str:
@@ -1600,7 +1985,7 @@ def looks_like_item_description(line: str) -> bool:
 def purchase_excel_debug_hint(content: bytes, ext: str) -> str:
     if ext == "pdf":
         return ". Text-based PDFs are supported, including PDFs exported from the Excel template. Scanned PDFs need OCR plus a PDF image renderer on the server."
-    if ext in {"jpg", "jpeg", "png"}:
+    if ext in PURCHASE_IMAGE_EXTENSIONS:
         return ". Image extraction needs Tesseract OCR installed on the server."
     try:
         if ext in {"xlsx", "xlsm"}:
@@ -1953,6 +2338,7 @@ def purchase_extraction_error(filename: str, issue: str) -> dict[str, Any]:
         "total": 0,
         "confidence": 0,
         "status": "Error",
+        "extraction_error": True,
         "issues": issue,
         "lines": [],
     }
