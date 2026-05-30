@@ -837,7 +837,7 @@ function stockMapDisplayNameSuggestions(value){
 function generateStockSku(value){
   const base=String(value||'ITEM').toUpperCase().replace(/[^A-Z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,18)||'ITEM';
   const existing=new Set([...document.querySelectorAll('#stock-map-tbody tr:not([data-empty-state]),#prod-tbody tr:not([data-empty-state])')]
-    .map(row=>(row.dataset.stockSku||row.dataset.itemCode||row.children[0]?.textContent||'').trim().toUpperCase()));
+    .map(row=>(row.dataset.stockSku||row.dataset.itemCode||inventoryRowCellText(row,0)||'').trim().toUpperCase()));
   if(!existing.has(base))return base;
   let index=2;
   while(existing.has(`${base}-${index}`))index+=1;
@@ -909,23 +909,8 @@ function ensureInventoryBulkSelection(scope=document){
   ['stock-level-tbody','prod-tbody','stock-map-tbody'].forEach(tbodyId=>{
     const tbody=(scope.getElementById?scope:document).getElementById?.(tbodyId)||document.getElementById(tbodyId);
     const table=tbody?.closest('table');
-    if(!tbody||!table)return;
-    const headRow=table.tHead?.rows?.[0];
-    if(headRow&&!headRow.querySelector('th[data-inventory-bulk-col]')){
-      const th=document.createElement('th');
-      th.dataset.inventoryBulkCol='1';
-      th.style.width='42px';
-      th.innerHTML=`<input type="checkbox" aria-label="Select all inventory rows" onchange="toggleInventoryBulkSelection('${tbodyId}',this.checked)">`;
-      headRow.insertBefore(th,headRow.firstChild);
-    }
-    [...tbody.rows].forEach(row=>{
-      if(row.dataset.emptyState==='1'||row.querySelector('td[colspan]'))return;
-      if(row.querySelector('td[data-inventory-bulk-col]'))return;
-      const td=document.createElement('td');
-      td.dataset.inventoryBulkCol='1';
-      td.innerHTML=inventoryBulkCellHtml(tbodyId,rowFirstValue(row));
-      row.insertBefore(td,row.firstChild);
-    });
+    table?.querySelectorAll('th[data-inventory-bulk-col]').forEach(cell=>cell.remove());
+    tbody?.querySelectorAll('td[data-inventory-bulk-col]').forEach(cell=>cell.remove());
   });
 }
 
@@ -1263,9 +1248,8 @@ function syncStockMappingFromItems(){
     .map(row=>(row.dataset.stockSku||row.children[0]?.textContent.trim()||'').toLowerCase()));
   const itemRows=[...document.querySelectorAll('#prod-tbody tr:not([data-empty-state])')];
   itemRows.forEach(row=>{
-    const cells=row.children;
-    const code=cells[0]?.textContent.trim()||'';
-    const name=cells[1]?.textContent.trim()||'';
+    const code=inventoryRowCellText(row,0);
+    const name=inventoryRowCellText(row,1);
     const key=(code||name).toLowerCase();
     if(!name||existing.has(key))return;
     const mappedName=generateStockMapName(name||code);
@@ -2189,18 +2173,6 @@ function renderDatabaseDashboardSummary(data){
     {label:'Audit Logs',count:counts.audit_count,page:'settings',tab:'set-backup',icon:'LOG',tone:'red',group:'Control',copy:'Backup and audit trail'}
   ];
   const totalRecords=rows.reduce((sum,item)=>sum+Number(item.count||0),0);
-  const activeAreas=rows.filter(item=>Number(item.count||0)>0).length;
-  const busiest=[...rows].sort((a,b)=>Number(b.count||0)-Number(a.count||0))[0]||rows[0];
-  const dbCoverage=Math.round((activeAreas/Math.max(rows.length,1))*100);
-  const groups=[...new Set(rows.map(item=>item.group))];
-  const groupTotals=groups.map(group=>({
-    group,
-    count:rows.filter(item=>item.group===group).reduce((sum,item)=>sum+Number(item.count||0),0),
-    areas:rows.filter(item=>item.group===group).length,
-    active:rows.filter(item=>item.group===group&&Number(item.count||0)>0).length,
-    tone:rows.find(item=>item.group===group)?.tone||'accent'
-  }));
-  const dbStamp=meta.updated_at||meta.generated_at||data.generated_at||new Date().toISOString();
   card.innerHTML=`
     <div class="card-hd app-function-hd">
       <div>
@@ -2210,44 +2182,6 @@ function renderDatabaseDashboardSummary(data){
       <div class="app-function-meta">
         <span class="b b-g">${escapeHtml(meta.status||'Database synced')}</span>
         <span class="mono">${rows.length.toLocaleString('en-AE')} areas - ${totalRecords.toLocaleString('en-AE')} records</span>
-      </div>
-    </div>
-    <div class="app-function-stage">
-      <div class="app-function-db-panel">
-        <div class="app-function-orb" style="--db-coverage:${dbCoverage}%">
-          <div class="app-function-orb-ring"></div>
-          <div class="app-function-orb-core">
-            <strong>${dbCoverage}</strong>
-            <span>DB Coverage</span>
-          </div>
-        </div>
-        <div class="app-function-db-meta">
-          <span class="b b-g">Live DB</span>
-          <strong>${totalRecords.toLocaleString('en-AE')} records</strong>
-          <span>${activeAreas.toLocaleString('en-AE')} of ${rows.length.toLocaleString('en-AE')} app areas have data</span>
-          <small>${escapeHtml(String(dbStamp).replace('T',' ').slice(0,19))}</small>
-        </div>
-      </div>
-      <div class="app-function-scorecards">
-        <div class="app-function-score">
-          <span>Total Records</span>
-          <strong class="mono">${totalRecords.toLocaleString('en-AE')}</strong>
-        </div>
-        <div class="app-function-score">
-          <span>Active Areas</span>
-          <strong class="mono">${activeAreas.toLocaleString('en-AE')}</strong>
-        </div>
-        <div class="app-function-score most">
-          <span>Most Active</span>
-          <strong>${escapeHtml(busiest?.label||'No records')}</strong>
-          <em class="mono">${Number(busiest?.count||0).toLocaleString('en-AE')} records</em>
-        </div>
-      </div>
-      <div class="app-function-strips">
-        ${groupTotals.map(item=>{
-          const width=totalRecords?Math.max(5,Math.round((item.count/totalRecords)*100)):0;
-          return `<div class="app-function-strip ${escapeHtml(item.tone)}"><div class="flx-b"><span>${escapeHtml(item.group)}</span><strong class="mono">${Number(item.count||0).toLocaleString('en-AE')}</strong></div><div class="app-function-strip-sub">${item.active}/${item.areas} areas - ${width}% of DB</div><i style="width:${width}%"></i></div>`;
-        }).join('')}
       </div>
     </div>
     <div class="db-shortcuts app-function-grid">
@@ -3774,6 +3708,45 @@ function loadMorePurchaseRecords(){
   });
 }
 
+async function clearPurchaseRecords(){
+  if(purchaseRecordsLoading){
+    toast('Purchase records are still loading','warn');
+    return;
+  }
+  if(!purchaseRecordsLoaded&&purchaseRecordCache.size<purchaseRecordsTotal){
+    await fetchAllPurchaseRecordsForStock();
+  }
+  const records=[...purchaseRecordCache.values()];
+  if(!records.length){
+    toast('No purchase records to clear','warn');
+    return;
+  }
+  const confirmed=await appConfirm({
+    title:'Clear Purchase Records',
+    message:`Clear ${records.length.toLocaleString('en-AE')} purchase record(s)? This removes their source transactions and stock movements from the database.`,
+    okText:'Clear Records'
+  });
+  if(!confirmed)return;
+  let deleted=0;
+  let failed=0;
+  for(const record of records){
+    const result=await deleteServer('purchaseRecords',record);
+    if(result?.deleted)deleted++;
+    else failed++;
+  }
+  if(deleted){
+    purchaseRecordCache.clear();
+    purchaseRecordsTotal=0;
+    purchaseRecordsOffset=0;
+    purchaseRecordsLoaded=true;
+    renderPurchaseRecordWindow();
+    syncStockLevelsFromProducts();
+    loadStockLevelsFromServer();
+    audit('Cleared purchase records',`${deleted} record(s)`,'Deleted');
+  }
+  toast(`${deleted.toLocaleString('en-AE')} purchase record(s) cleared${failed?`; ${failed.toLocaleString('en-AE')} failed`:''}`,failed?'warn':'ok');
+}
+
 function showRecentPurchaseRecords(){
   fetchPurchaseRecordsPage({reset:true}).then(data=>{
     const count=Array.isArray(data.records)?data.records.length:purchaseRecordCache.size;
@@ -4223,7 +4196,7 @@ function normalizeExtractedPurchaseInvoices(invoices=[],filename=''){
     if(lineSubtotal&&(!purchaseAiNumber(inv.subtotal)||inv.lines.length>1))inv.subtotal=Math.max(purchaseAiNumber(inv.subtotal),lineSubtotal);
     if(!purchaseAiNumber(inv.total))inv.total=purchaseAiNumber(inv.subtotal)+purchaseAiNumber(inv.vat_amount)+purchaseAiNumber(inv.shipping);
     inv.due=Math.max(0,purchaseAiNumber(inv.total)-purchaseAiNumber(inv.paid));
-    inv.items=inv.lines.length;
+    inv.items=purchaseLinesTotalQuantity(inv.lines)||inv.lines.length;
     if(isPurchaseExtractionError(inv))inv.lines=[];
     return inv;
   });
@@ -6486,20 +6459,17 @@ async function appendExtractedRows(invoices,filename){
     existingInvoiceNos.add(invoiceNo);
     const invoiceUid=`${Date.now()}-${invoiceIndex}-${Math.random().toString(36).slice(2,8)}`;
     const validation=validatePurchaseAiInvoice(inv);
-    const lines=Array.isArray(inv.lines)&&inv.lines.length?inv.lines:[{}];
-    lines.forEach((line,index)=>{
-      const row=document.createElement('div');
-      row.className='ai-extract-card';
-      row.setAttribute('data-inv',JSON.stringify(inv));
-      row.draggable=true;
-      row.dataset.invoiceNo=inv.invoice_no||'';
-      row.dataset.invoiceUid=invoiceUid;
-      row.dataset.lineIndex=String(index);
-      row.dataset.validation=validation.valid?'valid':'review';
-      row.innerHTML=purchaseAiRowHtml(inv,line,index,validation);
-      fragment.appendChild(row);
-      appended++;
-    });
+    const row=document.createElement('div');
+    row.className='ai-extract-card';
+    row.setAttribute('data-inv',JSON.stringify(inv));
+    row.draggable=true;
+    row.dataset.invoiceNo=inv.invoice_no||'';
+    row.dataset.invoiceUid=invoiceUid;
+    row.dataset.lineIndex='0';
+    row.dataset.validation=validation.valid?'valid':'review';
+    row.innerHTML=purchaseAiRowHtml(inv,(Array.isArray(inv.lines)&&inv.lines[0])||{},0,validation);
+    fragment.appendChild(row);
+    appended++;
     if(appended&&appended%100===0){
       tbody.insertBefore(fragment,tbody.firstChild);
       fragment=document.createDocumentFragment();
@@ -6668,6 +6638,12 @@ function purchaseAiInvoiceSummary(inv={}){
   return names.length>2?`${first} +${names.length-2}`:first;
 }
 
+function purchaseAiInvoiceLineTotal(inv={}){
+  const lines=Array.isArray(inv.lines)?inv.lines:[];
+  const lineTotal=lines.reduce((sum,line)=>sum+purchaseAiNumber(line.line_total||line.amount||line.total),0);
+  return lineTotal||purchaseAiNumber(inv.subtotal||inv.net_amount||inv.line_total||inv.amount);
+}
+
 function purchaseAiConfidenceBadge(inv={}){
   const confidence=purchaseAiNumber(inv.confidence);
   const cls=confidence>=90?'b-g':confidence>=70?'b-a':'b-r';
@@ -6689,13 +6665,15 @@ function purchaseAiStatusPillHtml(label='Pending',cls='pending'){
 
 function purchaseAiRowHtml(inv,line,index,validation){
   const fmt=n=>purchaseAiNumber(n).toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2});
-  const lineTotal=purchaseAiNumber(line.line_total||line.amount);
+  const lineTotal=purchaseAiInvoiceLineTotal(inv);
+  const qty=purchaseLinesTotalQuantity(inv.lines)||purchaseAiNumber(line.quantity||line.qty||inv.quantity||inv.qty);
+  const lineCount=Array.isArray(inv.lines)?inv.lines.length:0;
   const vat=purchaseAiNumber(inv.vat_amount);
-  const total=index===0?purchaseAiNumber(inv.total):(lineTotal+vat);
-  const paid=index===0?purchaseAiNumber(inv.paid):0;
+  const total=purchaseAiNumber(inv.total)||(lineTotal+vat+purchaseAiNumber(inv.shipping));
+  const paid=purchaseAiNumber(inv.paid);
   const status=purchaseAiStatusMeta(inv,validation);
-  const details=index===0?(validation.issues.join('; ')||purchaseAiRawDetails(line)||'Ready to save'):'';
-  const product=purchaseAiProductName(line)||'Extracted purchase item';
+  const details=validation.issues.join('; ')||purchaseAiRawDetails(line)||'Ready to save';
+  const product=purchaseAiInvoiceSummary(inv);
   return `
     <div class="ai-card-head">
       <div class="ai-card-title-wrap">
@@ -6718,9 +6696,19 @@ function purchaseAiRowHtml(inv,line,index,validation){
       <div><span>Total Due</span><strong class="mono">AED ${fmt(total)}</strong></div>
       <div><span>Paid</span><strong class="mono ${paid>0?'paid-ok':'paid-due'}">AED ${fmt(paid)}</strong></div>
     </div>
+    <div class="ai-card-product">
+      <div><span>Items</span><strong>${escapeHtml(product||'Extracted purchase item')}</strong></div>
+      <strong class="mono">${lineCount.toLocaleString('en-AE')} line${lineCount===1?'':'s'}</strong>
+    </div>
+    <div class="ai-card-kpis">
+      <div><span>Qty</span><strong class="mono">${qty.toLocaleString('en-AE',{maximumFractionDigits:4})}</strong></div>
+      <div><span>Line Total</span><strong class="mono accent">AED ${fmt(lineTotal)}</strong></div>
+      <div><span>VAT</span><strong class="mono">AED ${fmt(vat)}</strong></div>
+      <div><span>Gross Total</span><strong class="mono">AED ${fmt(total)}</strong></div>
+    </div>
     <div class="ai-card-foot">
       <span class="purchase-ai-details">${escapeHtml(details)}</span>
-      ${index===0?purchaseAiUploadActionsHtml():''}
+      ${purchaseAiUploadActionsHtml()}
     </div>`;
 }
 
@@ -7469,31 +7457,27 @@ function replacePurchaseAiInvoiceRows(oldInvoiceNo,inv,invoiceUid){
 
 function buildPurchaseAiInvoiceRows(inv,invoiceUid){
   const validation=validatePurchaseAiInvoice(inv);
-  const lines=Array.isArray(inv.lines)&&inv.lines.length?inv.lines:[{}];
-  return lines.map((line,index)=>{
-    const row=document.createElement('div');
-    row.className='ai-extract-card';
-    row.setAttribute('data-inv',JSON.stringify(inv));
-    row.draggable=true;
-    row.dataset.invoiceNo=inv.invoice_no||'';
-    row.dataset.invoiceUid=invoiceUid||`${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
-    row.dataset.lineIndex=String(index);
-    row.dataset.validation=validation.valid?'valid':'review';
-    row.innerHTML=purchaseAiRowHtml(inv,line,index,validation);
-    return row;
-  });
+  const row=document.createElement('div');
+  row.className='ai-extract-card';
+  row.setAttribute('data-inv',JSON.stringify(inv));
+  row.draggable=true;
+  row.dataset.invoiceNo=inv.invoice_no||'';
+  row.dataset.invoiceUid=invoiceUid||`${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+  row.dataset.lineIndex='0';
+  row.dataset.validation=validation.valid?'valid':'review';
+  row.innerHTML=purchaseAiRowHtml(inv,(Array.isArray(inv.lines)&&inv.lines[0])||{},0,validation);
+  return [row];
 }
 
 function updatePurchaseAiInvoiceRows(oldInvoiceNo,inv){
   const validation=validatePurchaseAiInvoice(inv);
   purchaseAiRows().forEach(row=>{
     if((row.dataset.invoiceNo||'')!==String(oldInvoiceNo||''))return;
-    const index=Number(row.dataset.lineIndex||0);
-    const line=Array.isArray(inv.lines)?(inv.lines[index]||{}):{};
     row.dataset.invoiceNo=inv.invoice_no||'';
     row.dataset.inv=JSON.stringify(inv);
+    row.dataset.lineIndex='0';
     row.dataset.validation=validation.valid?'valid':'review';
-    row.innerHTML=purchaseAiRowHtml(inv,line,index,validation);
+    row.innerHTML=purchaseAiRowHtml(inv,(Array.isArray(inv.lines)&&inv.lines[0])||{},0,validation);
   });
   enablePurchaseAiDragDrop();
   applyPurchaseAiSort(false);
@@ -7566,8 +7550,7 @@ function revalidatePurchaseAiRows(){
       const status=purchaseAiStatusMeta(inv,validation);
       validationCell.innerHTML=purchaseAiStatusPillHtml(status.label,status.cls);
     }
-    const index=Number(row.dataset.lineIndex||0);
-    if(detailsCell)detailsCell.textContent=index===0?(validation.issues.join('; ')||purchaseAiRawDetails(inv.lines?.[index]||{})||'Ready to save'):'';
+    if(detailsCell)detailsCell.textContent=validation.issues.join('; ')||purchaseAiRawDetails(inv.lines?.[0]||{})||'Ready to save';
   });
 }
 
@@ -7965,14 +7948,13 @@ function collectManualPurchaseExpenses(){
 function purchaseProductRecords(){
   const records=[];
   document.querySelectorAll('#prod-tbody tr:not([data-empty-state])').forEach(row=>{
-    const cells=row.children;
-    const code=cells[0]?.textContent.trim()||'';
-    const name=cells[1]?.textContent.trim()||'';
+    const code=inventoryRowCellText(row,0);
+    const name=inventoryRowCellText(row,1);
     if(!name)return;
     records.push({
       code,
       name,
-      unit:cells[4]?.textContent.trim()||'PCS',
+      unit:inventoryRowCellText(row,4)||'PCS',
       cost:Number(row.dataset.cost||0),
       supplier:row.dataset.supplier||''
     });
@@ -8543,27 +8525,27 @@ function invoiceProductRecords(){
     return record;
   };
   document.querySelectorAll('#prod-tbody tr:not([data-empty-state])').forEach(row=>{
-    const cells=row.children;
-    const code=cells[0]?.textContent.trim()||'';
-    const name=cells[1]?.textContent.trim()||'';
+    const code=inventoryRowCellText(row,0);
+    const name=inventoryRowCellText(row,1);
     if(!name)return;
-    const isItemMasterRow=cells.length>=9;
+    const dataCellCount=[...row.children].filter(cell=>cell.dataset.inventoryBulkCol!=='1').length;
+    const isItemMasterRow=dataCellCount>=9;
     addRecord({
       code,
       name,
-      unit:(isItemMasterRow?cells[4]?.textContent.trim():cells[3]?.textContent.trim())||'PCS',
-      price:isItemMasterRow?Number(row.dataset.price||row.dataset.cost||0):parseAmount(cells[4]?.textContent)
+      unit:(isItemMasterRow?inventoryRowCellText(row,4):inventoryRowCellText(row,3))||'PCS',
+      price:isItemMasterRow?Number(row.dataset.price||row.dataset.cost||0):parseAmount(inventoryRowCellText(row,4))
     });
   });
   document.querySelectorAll('#stock-map-tbody tr:not([data-empty-state])').forEach(row=>{
-    const productName=row.children[0]?.textContent.trim()||'';
-    const mappedName=row.children[2]?.textContent.trim()||productName;
+    const productName=inventoryRowCellText(row,0);
+    const mappedName=inventoryRowCellText(row,2)||productName;
     const name=mappedName||productName;
     if(!name)return;
     const itemRow=[...document.querySelectorAll('#prod-tbody tr:not([data-empty-state])')]
       .find(item=>{
-        const itemCode=(item.children[0]?.textContent.trim()||'').toLowerCase();
-        const itemName=(item.children[1]?.textContent.trim()||'').toLowerCase();
+        const itemCode=inventoryRowCellText(item,0).toLowerCase();
+        const itemName=inventoryRowCellText(item,1).toLowerCase();
         const sku=String(row.dataset.stockSku||'').toLowerCase();
         return itemCode===sku||itemName===productName.toLowerCase()||itemName===mappedName.toLowerCase();
       });
@@ -8571,7 +8553,7 @@ function invoiceProductRecords(){
       code:row.dataset.stockSku||'',
       name,
       aliases:[productName,mappedName],
-      unit:itemRow?.children[4]?.textContent.trim()||'PCS',
+      unit:itemRow?inventoryRowCellText(itemRow,4):'PCS',
       price:Number(row.dataset.priceOuter||row.dataset.incVat||0),
       sourcePrice:Number(row.dataset.priceOuter||row.dataset.incVat||0),
       source:'Inventory Mapping',

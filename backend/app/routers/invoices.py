@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
 from app.dependencies import get_current_user
+from app.module_integration import sync_sales_invoice_accounting
 from app.models import Invoice, InvoiceLine, User
 from app.schemas import InvoiceCreate, InvoiceOut
 
@@ -60,6 +61,8 @@ def create_invoice(
     invoice.lines = [InvoiceLine(**line.model_dump()) for line in payload.lines]
     calculate_totals(invoice)
     db.add(invoice)
+    db.flush()
+    sync_sales_invoice_accounting(db, invoice, current_user.id)
     db.commit()
     db.refresh(invoice)
     return invoice

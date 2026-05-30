@@ -25,10 +25,19 @@ Local development note:
 
 ```text
 backend/.env currently points local SQLite to taxflow-seed50-v2.db.
-frontend/.env.local can point Vite to a local API port, for example http://127.0.0.1:8010/api/v1.
-backend/scripts/add_seed_50_all.py seeds at least 50 records across all SQLAlchemy tables and key UI collections.
+frontend/.env.local points Vite to http://127.0.0.1:8000/api/v1 for the default local backend.
+backend/scripts/add_seed_50_real.py extends the local seed set for realistic module data.
 SQLite journaling is disabled in local dev because this Windows workspace denies rollback-journal deletion.
 Production must use PostgreSQL with normal transactional durability.
+```
+
+Verified local runtime:
+
+```text
+Frontend: http://127.0.0.1:5173/
+Backend:  http://127.0.0.1:8000
+Docs:     http://127.0.0.1:8000/docs
+Login:    admin@taxflowapp.com / admin123
 ```
 
 Production must harden the current backend with a production relational database, object storage, queue workers, backend validation, stronger audit logging, and tenant enforcement.
@@ -89,8 +98,8 @@ http://127.0.0.1:5173
   |
   v
 FastAPI backend
-http://127.0.0.1:8010/api/v1 in the current Windows local run
-http://127.0.0.1:8000/api/v1 by default when port 8000 is available
+http://127.0.0.1:8000/api/v1 by default
+alternate ports can be used by updating frontend/.env.local
   |
   v
 SQLite seed database
@@ -263,12 +272,37 @@ The live dev app keeps app-data as a compatibility bridge while proper module AP
 Current module APIs already added:
 
 ```text
+/api/v1/auth
+/api/v1/companies/current
+/api/v1/invoices
+/api/v1/documents
+/api/v1/jobs
+/api/v1/source-transactions
+/api/v1/accounts
+/api/v1/journal
+/api/v1/voucher-types
+/api/v1/vouchers
+/api/v1/general-ledger
+/api/v1/posting-jobs
+/api/v1/payments
+/api/v1/receipts
+/api/v1/bank-accounts
+/api/v1/bank-statement-lines
+/api/v1/bank-reconciliation/matches
+/api/v1/period-locks
+/api/v1/tax
 /api/v1/purchases
 /api/v1/items
 /api/v1/units
 /api/v1/settings
+/api/v1/warehouses
+/api/v1/inventory/mappings
 /api/v1/exceptions
 /api/v1/events
+/api/v1/payroll
+/api/v1/reports
+/api/v1/audit/trail
+/api/v1/corporate-accounting
 /api/v1/item-units
 /api/v1/item-unit-conversions
 /api/v1/inventory/stock-levels
@@ -1929,12 +1963,59 @@ The following proper module APIs are now live and should become the preferred wr
 Live module APIs:
 
 ```text
+POST     /api/v1/auth/login
+GET      /api/v1/auth/me
+GET      /api/v1/companies/current
+GET/POST /api/v1/invoices
+GET/POST /api/v1/documents
+GET      /api/v1/jobs
+POST     /api/v1/jobs/vat-summary
+GET/POST /api/v1/source-transactions
+POST     /api/v1/source-transactions/{source_id}/validate
+POST     /api/v1/source-transactions/{source_id}/approve
+GET/POST /api/v1/accounts
+DELETE   /api/v1/accounts/{account_id}
+GET/POST /api/v1/journal
+GET/POST /api/v1/voucher-types
+GET/POST /api/v1/vouchers
+POST     /api/v1/vouchers/{voucher_id}/approve
+GET      /api/v1/general-ledger
+GET      /api/v1/posting-jobs
+POST     /api/v1/posting-jobs/{job_id}/retry
+GET/POST /api/v1/payments
+GET/POST /api/v1/receipts
+GET/POST /api/v1/bank-accounts
+POST     /api/v1/bank-statement-lines
+POST     /api/v1/bank-reconciliation/matches
+POST     /api/v1/period-locks
+GET/POST /api/v1/tax/codes
+GET      /api/v1/tax/lines
+GET      /api/v1/tax/vat-return
+GET/POST /api/v1/tax/vat-returns
+GET/POST /api/v1/tax/corporate-tax-returns
 GET/POST /api/v1/purchases
 GET/POST /api/v1/items
 GET/POST /api/v1/units
 GET/POST /api/v1/settings
+GET/POST /api/v1/warehouses
+GET/POST /api/v1/inventory/mappings
+PUT      /api/v1/inventory/mappings/{mapping_id}
+DELETE   /api/v1/inventory/mappings/{mapping_id}
+DELETE   /api/v1/inventory/stock-levels
 GET/POST /api/v1/events
 GET/POST /api/v1/exceptions
+GET      /api/v1/payroll/employees
+GET      /api/v1/payroll/runs
+POST     /api/v1/payroll/generate
+POST     /api/v1/payroll/runs/{run_id}/wps-batch
+GET      /api/v1/reports/dashboard
+GET      /api/v1/reports/trial-balance
+GET      /api/v1/reports/summary
+GET      /api/v1/audit/trail
+GET      /api/v1/ai/workbench
+POST     /api/v1/ai/assist
+POST     /api/v1/ai/validate-transaction
+POST     /api/v1/ai/explain-exception
 GET      /api/v1/corporate-accounting/summary
 GET      /api/v1/corporate-accounting/corporate-tax
 GET      /api/v1/corporate-accounting/fixed-assets
@@ -1951,37 +2032,26 @@ GET/POST /api/v1/item-unit-conversions
 GET      /api/v1/inventory/stock-levels
 GET      /api/v1/inventory/valuation-layers
 GET/POST /api/v1/inventory/adjustment-approvals
+GET      /api/v1/app-data
+POST     /api/v1/app-data
+GET      /api/v1/app-data/records/{collection}
 ```
 
-Important endpoints:
+Target workflow endpoints not yet fully implemented:
 
 ```http
-POST /auth/login
-GET  /auth/me
-
-POST /source-transactions
-POST /source-transactions/{id}/validate
-POST /source-transactions/{id}/submit
-POST /source-transactions/{id}/approve
-
-POST /accounting/posting-jobs
-POST /accounting/posting-jobs/{id}/retry
-POST /accounting/journals/{id}/reverse
-
-POST /tax/periods/{id}/close
-POST /vat-returns
-
-POST /einvoicing/generate
-POST /einvoicing/{id}/validate
-POST /einvoicing/{id}/transmit
-POST /einvoicing/{id}/retry
-
-POST /wps/generate-sif
-POST /wps/{id}/validate
-POST /wps/{id}/mark-uploaded
-
-POST /documents/extract
-POST /documents/{id}/link
+POST /api/v1/source-transactions/{id}/submit
+POST /api/v1/accounting/journals/{id}/reverse
+POST /api/v1/tax/periods/{id}/close
+POST /api/v1/einvoicing/generate
+POST /api/v1/einvoicing/{id}/validate
+POST /api/v1/einvoicing/{id}/transmit
+POST /api/v1/einvoicing/{id}/retry
+POST /api/v1/wps/generate-sif
+POST /api/v1/wps/{id}/validate
+POST /api/v1/wps/{id}/mark-uploaded
+POST /api/v1/documents/extract
+POST /api/v1/documents/{id}/link
 ```
 
 ## 24. Security Architecture

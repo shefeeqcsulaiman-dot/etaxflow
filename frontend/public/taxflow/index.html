@@ -714,6 +714,7 @@
         <div class="flx">
           <button class="btn btn-g btn-sm" id="purchase-show-recent-btn" type="button" onclick="showRecentPurchaseRecords()">Show Recent</button>
           <button class="btn btn-g btn-sm" id="purchase-load-more-btn" type="button" onclick="loadMorePurchaseRecords()">Load More</button>
+          <button class="btn btn-g btn-sm" type="button" onclick="clearPurchaseRecords()">Clear Records</button>
           <button class="btn btn-p btn-sm" type="button" onclick="openPurchaseAddChoice()">+ Manual Entry</button>
         </div>
       </div>
@@ -1552,7 +1553,7 @@
       <div class="stat"><div class="stat-lbl">Out of Stock</div><div class="stat-val" style="color:var(--red)">0</div><div class="stat-delta">need reorder</div></div>
     </div>
     <div class="card">
-      <div class="card-hd"><div class="card-title">Current Stock Levels</div><div class="flx"><button class="btn btn-g" onclick="inventoryBulkDeleteSelected('stock-level-tbody')">Bulk Delete</button><button class="btn btn-g" onclick="clearInventoryTable()">Clear Table</button><button class="btn btn-p" onclick="openInventoryItemModal()">+ Add Item</button></div></div>
+      <div class="card-hd"><div class="card-title">Current Stock Levels</div><div class="flx"><button class="btn btn-g" onclick="clearInventoryTable()">Clear Table</button><button class="btn btn-p" onclick="openInventoryItemModal()">+ Add Item</button></div></div>
       <table class="tbl">
         <thead><tr><th>Item Code</th><th>Item Name</th><th>Category</th><th>Current Stock</th><th>Unit</th><th>Reorder Level</th><th>Status</th><th></th></tr></thead>
         <tbody id="stock-level-tbody">
@@ -1564,7 +1565,7 @@
 
   <div class="tab-body" id="inv-items">
     <div class="card">
-      <div class="card-hd"><div class="card-title">Item Master</div><div class="flx"><button class="btn btn-g" onclick="inventoryBulkDeleteSelected('prod-tbody')">Bulk Delete</button><button class="btn btn-p" onclick="openInventoryItemModal()">+ New Item</button></div></div>
+      <div class="card-hd"><div class="card-title">Item Master</div><div class="flx"><button class="btn btn-p" onclick="openInventoryItemModal()">+ New Item</button></div></div>
       <table class="tbl">
         <thead><tr><th>Code</th><th>Name</th><th>Type</th><th>Category</th><th>Unit</th><th>Default Warehouse</th><th>Tracking</th><th>VAT</th><th>Status</th></tr></thead>
         <tbody id="prod-tbody">
@@ -1594,7 +1595,7 @@
   <div class="tab-body" id="inv-mapping">
     <div class="g2 mb16">
       <div class="card">
-        <div class="card-hd"><div><div class="card-title">Stock Mapping</div><div class="card-sub">Item Master list with TaxFlow mapping status</div></div><div class="flx"><button class="btn btn-g btn-sm" type="button" onclick="inventoryBulkDeleteSelected('stock-map-tbody')">Bulk Delete</button><button class="btn btn-p btn-sm" type="button" onclick="openNewStockMap()">+ Add Mapping</button></div></div>
+        <div class="card-hd"><div><div class="card-title">Stock Mapping</div><div class="card-sub">Item Master list with TaxFlow mapping status</div></div><div class="flx"><button class="btn btn-p btn-sm" type="button" onclick="openNewStockMap()">+ Add Mapping</button></div></div>
         <table class="tbl" data-delete-actions-bound="skip">
           <thead><tr><th>Display Name</th><th>Supplier Name</th><th>TaxFlow Name</th><th>Units/Outer</th><th>Mapping Status</th><th>Actions</th></tr></thead>
           <tbody id="stock-map-tbody">

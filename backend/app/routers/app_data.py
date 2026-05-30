@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.dependencies import get_current_user
+from app.module_integration import sync_purchase_accounting, sync_sales_invoice_accounting
 from app.models import (
     Account,
     AppDataRecord,
@@ -90,6 +91,7 @@ def record_key(collection: str, record: dict[str, Any]) -> str | None:
         "rotaSwaps": "id",
         "rotaApprovals": "id",
         "rotaDrafts": "id",
+        "rotaAssignments": "id",
         "app_actions": "id",
     }
     field = keys.get(collection)
@@ -402,18 +404,16 @@ def sync_domain_model(db: Session, current_user: User, collection: str, record: 
 
     elif collection == "purchaseRecords":
         reference = str(record.get("ref") or record.get("invoice_no") or "PURCHASE")
-        sync_source_transaction(
+        sync_purchase_accounting(
             db,
-            current_user,
-            module="purchase",
+            company_id=current_user.company_id,
             reference=reference,
             party_name=str(record.get("supplier") or ""),
             subtotal=decimal_value(record.get("net_amount") or record.get("subtotal")),
             vat=decimal_value(record.get("tax_amount") or record.get("vat_amount")),
             total=decimal_value(record.get("total")),
-            status=str(record.get("status") or "draft"),
-            lines=record.get("lines"),
-            tax_type=str(record.get("tax_type") or ""),
+            lines=record.get("lines") if isinstance(record.get("lines"), list) else None,
+            user_id=current_user.id,
         )
         sync_purchase_stock(db, current_user, record, reference)
 
@@ -631,6 +631,8 @@ def sync_sales_invoice(db: Session, current_user: User, record: dict[str, Any]) 
                 vat_rate=Decimal("5"),
             )
         ]
+    db.flush()
+    sync_sales_invoice_accounting(db, invoice, current_user.id)
 
 
 def sync_source_transaction(
@@ -645,7 +647,7 @@ def sync_source_transaction(
     status: str,
     lines: list[dict[str, Any]] | None = None,
     tax_type: str = "",
-) -> None:
+) -> SourceTransaction:
     existing = (
         db.query(SourceTransaction)
         .filter(
@@ -684,6 +686,7 @@ def sync_source_transaction(
                 amount=amount,
                 vat_amount=amount * (vat_rate / Decimal("100")),
             ))
+    return tx
 
 
 def log_action(db: Session, current_user: User, module: str, action: str, detail: Any) -> None:
@@ -1506,30 +1509,69 @@ def extract_image_text_with_tesseract(content: bytes, ext: str) -> str:
         return ""
     suffix = "." + ("jpg" if ext == "jpeg" else ext)
     with tempfile.TemporaryDirectory() as tmp:
-        image_path = Path(tmp) / ("upload" + suffix)
         output_base = Path(tmp) / "ocr"
-        image_path.write_bytes(content)
+        variants = [content]
+        processed = preprocess_image_for_ocr(content)
+        if processed and processed != content:
+            variants.append(processed)
+        best_text = ""
+        best_score = -1
+        for index, variant in enumerate(variants):
+            image_path = Path(tmp) / f"upload_{index}{'.png' if index else suffix}"
+            image_path.write_bytes(variant)
+            text = run_tesseract_image(tesseract, image_path, output_base)
+            score = score_invoice_ocr_text(text)
+            if score > best_score:
+                best_text = text
+                best_score = score
+        return best_text
+
+
+def run_tesseract_image(tesseract: str, image_path: Path, output_base: Path) -> str:
+    for psm in ("6", "4"):
         result = subprocess.run(
-            [tesseract, str(image_path), str(output_base), "--psm", "6", "-c", "preserve_interword_spaces=1"],
+            [tesseract, str(image_path), str(output_base), "--psm", psm, "-c", "preserve_interword_spaces=1"],
             capture_output=True,
             text=True,
             timeout=45,
             check=False,
         )
-        if result.returncode != 0:
-            result = subprocess.run(
-                [tesseract, str(image_path), str(output_base), "--psm", "4", "-c", "preserve_interword_spaces=1"],
-                capture_output=True,
-                text=True,
-                timeout=45,
-                check=False,
-            )
-            if result.returncode != 0:
+        if result.returncode == 0:
+            try:
+                return output_base.with_suffix(".txt").read_text(encoding="utf-8", errors="ignore")
+            except OSError:
                 return ""
-        try:
-            return (output_base.with_suffix(".txt")).read_text(encoding="utf-8", errors="ignore")
-        except OSError:
-            return ""
+    return ""
+
+
+def score_invoice_ocr_text(text: str) -> int:
+    if not text:
+        return 0
+    item_codes = len(re.findall(r"[\[\{\(1].{0,3}[0-9]{4,}[\]\}\)]", text))
+    money_values = len(money_values_in_line(text))
+    product_hints = len(re.findall(r"\b(description|qty|invoice|vat|total|discount)\b", text, flags=re.IGNORECASE))
+    return item_codes * 20 + money_values * 3 + product_hints
+
+
+def preprocess_image_for_ocr(content: bytes) -> bytes | None:
+    try:
+        from PIL import Image, ImageOps, ImageFilter  # type: ignore[import-not-found]
+    except Exception:
+        return None
+    try:
+        with Image.open(io.BytesIO(content)) as image:
+            image = ImageOps.exif_transpose(image).convert("L")
+            width, height = image.size
+            scale = 2 if max(width, height) < 2400 else 1
+            if scale > 1:
+                image = image.resize((width * scale, height * scale))
+            image = ImageOps.autocontrast(image)
+            image = image.filter(ImageFilter.SHARPEN)
+            output = io.BytesIO()
+            image.save(output, format="PNG")
+            return output.getvalue()
+    except Exception:
+        return None
 
 
 def find_tesseract_executable() -> str | None:
@@ -1817,22 +1859,23 @@ def purchase_columnar_item_rows_from_lines(
     rows: list[dict[str, Any]] = []
     current: list[str] = []
     for line in lines:
-        if is_document_summary_line(line):
+        normalized_line = normalize_ocr_item_line(line)
+        if is_document_summary_line(normalized_line):
             if current:
                 row = parse_columnar_purchase_item(current, invoice_no, date, supplier, trn, pay_term)
                 if row:
                     rows.append(row)
                 current = []
             continue
-        if re.search(r"(?:^|\s)\d{1,3}\s+\[[A-Z0-9\-]{3,}\]", line) or re.search(r"\[[A-Z0-9\-]{3,}\]", line):
+        if is_columnar_purchase_item_start(normalized_line):
             if current:
                 row = parse_columnar_purchase_item(current, invoice_no, date, supplier, trn, pay_term)
                 if row:
                     rows.append(row)
-            current = [line]
+            current = [normalized_line]
             continue
         if current:
-            current.append(line)
+            current.append(normalized_line)
             if len(money_values_in_line(" ".join(current))) >= 5:
                 row = parse_columnar_purchase_item(current, invoice_no, date, supplier, trn, pay_term)
                 if row:
@@ -1845,6 +1888,47 @@ def purchase_columnar_item_rows_from_lines(
     return rows[:200]
 
 
+def normalize_ocr_item_line(line: str) -> str:
+    text = str(line or "")
+    text = text.replace("Â£", "E").replace("£", "E").replace("€", "E").replace("â‚¬", "E")
+    text = text.replace("1E", "[E").replace("1€", "[E").replace("1Â£", "[E")
+    text = re.sub(r"[\{\(\[]\s*E?([0-9]{4,})[\]\)\}]", r"[E\1]", text)
+    text = re.sub(r"\[\s*E?([0-9]{4,})[\]\)\}]", r"[E\1]", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def is_columnar_purchase_item_start(line: str) -> bool:
+    return bool(
+        re.search(r"(?:^|\s)\d{1,3}\s+\[E?[0-9]{4,}\]", line)
+        or re.search(r"\[E?[0-9]{4,}\]", line)
+        or re.search(r"(?:^|\s)\d{1,3}\s+\[[0-9]{4,}\]", line)
+    )
+
+
+def clean_columnar_product_description(value: str) -> str:
+    text = str(value or "")
+    text = re.split(
+        r"\b(?:lot|exp\.?\s*date|price|discount|excl\.?\s*vat|incl\.?\s*vat|v\s*code)\b",
+        text,
+        maxsplit=1,
+        flags=re.IGNORECASE,
+    )[0]
+    text = re.split(r"\b[0-9]{5}[- ][0-9]{2}\b", text, maxsplit=1)[0]
+    text = re.split(r"\b\d{2}\s*-\s*\d{4,6}\s*-\s*\d{2}\b", text, maxsplit=1)[0]
+    text = re.split(r"\b[0-9]{1,2}[\/\-][0-9]{1,2}[\/\-][0-9]{2,4}\b", text, maxsplit=1)[0]
+    pack_match = re.search(r"^(.+\([^)]+\))", text)
+    if pack_match:
+        text = pack_match.group(1)
+    text = re.sub(r"\b[0-9]{5,}[A-Z0-9-]*\b", " ", text)
+    text = re.sub(r"\b[0-9]+[A-Z]\b", " ", text)
+    text = re.sub(r"\b[0-9]{2,3}[-.,]\b", " ", text)
+    text = re.sub(r"\b[0-9]{1,3}\s+(?=[A-Z][a-z])", " ", text)
+    text = re.sub(r"\b(?:AED|DHS|VAT|QTY|PCS|NOS|EA|UNIT|DISCOUNT|PRICE|EXCL|INCL)\b", " ", text, flags=re.IGNORECASE)
+    text = re.sub(r"\s+[A-Z]{1,3}[.,]?\s*$", " ", text)
+    text = re.sub(r"[^\w\s&+/'().,-]", " ", text)
+    return re.sub(r"\s+", " ", text).strip(" :-.,")[:180]
+
+
 def parse_columnar_purchase_item(
     parts: list[str],
     invoice_no: str,
@@ -1853,33 +1937,21 @@ def parse_columnar_purchase_item(
     trn: str,
     pay_term: str = "",
 ) -> dict[str, Any] | None:
-    text = " ".join(parts)
+    text = normalize_ocr_item_line(" ".join(parts))
     money = money_values_in_line(text)
-    if len(money) < 3:
-        return None
-    item_match = re.search(r"(?:^|\s)(?:\d{1,3}\s+)?\[([A-Z0-9\-]{3,})\]\s*(.+)", text)
+    item_match = re.search(r"(?:^|\s)(?:\d{1,3}\s+)?\[?E?([0-9]{4,})\]?\s*(.+)", text)
     if not item_match:
         return None
-    sku = item_match.group(1)
-    description_area = item_match.group(2)
-    description_area = re.split(r"\b\d{2}\s*-\s*\d{4,6}\s*-\s*\d{2}\b", description_area, maxsplit=1)[0]
-    description_area = re.split(r"\b(?:lot|exp\.?\s*date|price|discount|excl\.?\s*vat|incl\.?\s*vat)\b", description_area, maxsplit=1, flags=re.IGNORECASE)[0]
-    product = re.sub(r"\s+", " ", description_area).strip(" :-")
+    sku = "E" + item_match.group(1).zfill(6)
+    product = clean_columnar_product_description(item_match.group(2))
     if not product or re.search(r"\b(description|invoice|total|subtotal|vat)\b", product, flags=re.IGNORECASE):
         return None
-    qty = Decimal("1")
-    qty_match = re.search(r"\b\d{2}\s*-\s*\d{4,6}\s*-\s*\d{2}\s+([0-9]+(?:[.,][0-9]+)?)\b", text)
-    if qty_match:
-        qty = decimal_value(qty_match.group(1)) or Decimal("1")
-    else:
-        item_number = re.match(r"\s*\d{1,3}\s+\[", text)
-        qty_candidates = re.findall(r"(?<![A-Z0-9])([1-9][0-9]{0,2})(?![A-Z0-9])", text[item_number.end() if item_number else 0:])
-        if qty_candidates:
-            qty = decimal_value(qty_candidates[0]) or Decimal("1")
+    if not money:
+        return None
+    qty = extract_columnar_quantity(text, item_match.end())
     price_before_tax = decimal_value(money[0])
     price_after_discount = decimal_value(money[-4]) if len(money) >= 6 else price_before_tax
-    line_total = decimal_value(money[-3])
-    vat_amount = decimal_value(money[-2])
+    line_total, vat_amount = columnar_line_net_and_vat(money, price_before_tax)
     if line_total <= 0:
         return None
     return normalize_purchase_row({
@@ -1899,6 +1971,49 @@ def parse_columnar_purchase_item(
         "line_total": line_total,
         "tax_type": "VAT 5%" if vat_amount else "None",
     })
+
+
+def extract_columnar_quantity(text: str, item_match_end: int = 0) -> Decimal:
+    patterns = (
+        r"\b[0-9]{4,5}-[0-9]{2}\s*[=\-]?\s+([0-9]+(?:[.,][0-9]+)?)\s+(?:[A-Z]{0,3})?[0-9]{1,2}[\/\-][0-9]{1,2}[\/\-][0-9]{2,4}\b",
+        r"\b[0-9]{4,5}-[0-9]{2}\s*[=\-]?\s+([0-9]+(?:[.,][0-9]+)?)\s+[A-Z]{1,4}[0-9]{5,8}\b",
+        r"\b[A-Z]{2,}[0-9]{2}\s+([0-9]+(?:[.,][0-9]+)?)\s+[A-Z0-9]{5,}\s+[0-9]",
+    )
+    for pattern in patterns:
+        match = re.search(pattern, text, flags=re.IGNORECASE)
+        if match:
+            qty = decimal_value(match.group(1))
+            if qty > 0:
+                return qty
+    before_money = re.split(r"\b[0-9][0-9,]*[.,][0-9]{1,2}\b", text[item_match_end:], maxsplit=1)[0]
+    candidates = [
+        decimal_value(value)
+        for value in re.findall(r"(?<![A-Z0-9])([1-9][0-9]{0,2})(?![A-Z0-9])", before_money)
+    ]
+    candidates = [value for value in candidates if Decimal("0") < value <= Decimal("999")]
+    return candidates[-1] if candidates else Decimal("1")
+
+
+def columnar_line_net_and_vat(money: list[str], unit_price: Decimal) -> tuple[Decimal, Decimal]:
+    values = [decimal_value(value) for value in money]
+    if len(values) >= 5:
+        return values[-3], values[-2]
+    if len(values) == 4:
+        line_total = values[-3]
+        vat = values[-2]
+        gross = values[-1]
+        expected_vat = gross - line_total
+        if expected_vat > 0 and (vat <= 0 or vat > line_total * Decimal("0.20")):
+            vat = expected_vat
+        return line_total, vat
+    if len(values) == 3:
+        vat = values[-2]
+        gross = values[-1]
+        line_total = gross - vat if gross > vat else values[0]
+        return line_total, vat
+    if len(values) == 2:
+        return values[-1], Decimal("0")
+    return unit_price, Decimal("0")
 
 
 def purchase_item_rows_from_lines(lines: list[str], invoice_no: str, date: str, supplier: str, trn: str, pay_term: str = "") -> list[dict[str, Any]]:
@@ -1955,8 +2070,17 @@ def purchase_item_rows_from_lines(lines: list[str], invoice_no: str, date: str, 
 
 
 def money_values_in_line(line: str) -> list[str]:
+    line = split_glued_ocr_money_values(str(line or ""))
     values = re.findall(
         r"(?<![A-Z0-9])(?:AED|Dhs\.?|د\.إ|Ø¯\.Ø¥)\s*([0-9][0-9,]*(?:[.,][0-9]{1,2})?)|(?<![A-Z0-9])([0-9][0-9,]*(?:[.,][0-9]{1,2}))(?![A-Z0-9])",
+        line,
+        flags=re.IGNORECASE,
+    )
+    money_pattern = r"(?:[0-9]{1,3}(?:,[0-9]{3})+|[0-9]+)(?:[.,][0-9]{1,2})?"
+    decimal_money_pattern = r"(?:[0-9]{1,3}(?:,[0-9]{3})+|[0-9]+)[.,][0-9]{1,2}"
+    currency_pattern = r"AED|Dhs\.?|Ø¯\.Ø¥|Ã˜Â¯\.Ã˜Â¥"
+    values = re.findall(
+        rf"(?<![A-Z0-9])(?:{currency_pattern})\s*({money_pattern})(?![A-Z0-9])|(?<![A-Z0-9])({decimal_money_pattern})(?![A-Z0-9])",
         line,
         flags=re.IGNORECASE,
     )
@@ -1967,6 +2091,19 @@ def money_values_in_line(line: str) -> list[str]:
         if number > 0:
             cleaned.append(str(number))
     return cleaned
+
+
+def split_glued_ocr_money_values(line: str) -> str:
+    text = str(line or "")
+    previous = None
+    while previous != text:
+        previous = text
+        text = re.sub(
+            r"([0-9][0-9,]*\.[0-9]{1,2})(?=[0-9]{1,6}[.,][0-9]{1,2}(?![0-9]))",
+            r"\1 ",
+            text,
+        )
+    return text
 
 
 def is_document_summary_line(line: str) -> bool:

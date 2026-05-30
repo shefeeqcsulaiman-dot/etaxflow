@@ -1,6 +1,14 @@
 from decimal import Decimal
 
-from app.models import AppDataRecord, InventoryValuationLayer, StockMovement, StockProductMapping
+from app.models import (
+    AppDataRecord,
+    CorporateTaxRecord,
+    InventoryValuationLayer,
+    JournalEntry,
+    SourceTransaction,
+    StockMovement,
+    StockProductMapping,
+)
 
 
 def test_inventory_unit_conversion_records(client, auth_headers):
@@ -76,6 +84,22 @@ def test_purchase_record_syncs_line_quantity_to_stock_tables(client, auth_header
     assert movement.quantity == Decimal("8.00")
     assert layer.quantity_in == Decimal("8.00")
     assert layer.quantity_remaining == Decimal("8.00")
+    source = (
+        db.query(SourceTransaction)
+        .filter(SourceTransaction.module == "purchase", SourceTransaction.reference == "PUR-QTY-008")
+        .one()
+    )
+    assert source.status == "posted"
+    assert source.subtotal == Decimal("1480.00")
+    journal = (
+        db.query(JournalEntry)
+        .filter(JournalEntry.source_module == "purchase", JournalEntry.source_id == source.id)
+        .one()
+    )
+    assert journal.status == "posted"
+    corporate_tax = db.query(CorporateTaxRecord).order_by(CorporateTaxRecord.created_at.desc()).first()
+    assert corporate_tax is not None
+    assert corporate_tax.status == "calculated"
 
     stock_levels = client.get("/api/v1/inventory/stock-levels", headers=auth_headers)
     assert stock_levels.status_code == 200
