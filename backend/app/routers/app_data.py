@@ -52,6 +52,10 @@ def decimal_value(value: Any) -> Decimal:
                 cleaned = cleaned.replace(",", "")
         elif "," in cleaned and "." in cleaned:
             cleaned = cleaned.replace(",", "")
+        # Strip trailing non-numeric text (e.g. "5KG" → "5", "3Nos" → "3")
+        m = re.match(r"^-?[0-9]*\.?[0-9]+", cleaned)
+        if m:
+            cleaned = m.group(0)
         return Decimal(cleaned or "0")
     except (InvalidOperation, ValueError):
         return Decimal("0")
@@ -1163,31 +1167,33 @@ Return ONLY a valid JSON object. Do not include markdown, code fences, or extra 
   "trn_vat": "TRN or VAT registration number of supplier, empty string if not found",
   "bill_to": "buyer or customer name, empty string if not found",
   "currency": "3-letter currency code e.g. AED USD EUR",
-  "subtotal_excl_vat": "subtotal before VAT / invoice total before discount as plain number, empty string if not found",
+  "subtotal_excl_vat": "subtotal before VAT as plain number e.g. 1000.00, empty string if not found",
   "total_discount": "total discount amount for the whole invoice as plain number, empty string if no discount shown",
   "vat_amount": "total VAT amount as plain number, empty string if not found",
   "total_payable": "final total including VAT as plain number, empty string if not found",
   "line_items": [
     {
       "description": "full product or service description exactly as written",
-      "qty": "quantity as string",
-      "unit": "unit of measure if visible, otherwise empty string",
+      "qty": "quantity as plain number only e.g. 1, 2.5, 10 — no units, no text",
+      "unit": "unit of measure if visible e.g. PCS KG BOX, otherwise empty string",
       "unit_price": "unit price before discount as plain number, or Free for free items",
       "discount_pct": "discount percentage as plain number e.g. 13.00, empty string if none",
       "discount_amount": "discount amount in currency as plain number, empty string if none",
-      "line_total_excl_vat": "line total before VAT as plain number, empty string if not visible",
-      "line_total": "final line total including VAT as plain number, 0.00 for free items"
+      "line_total_excl_vat": "line amount as printed on invoice before VAT as plain number — on UAE/GCC invoices this is the column amount shown in the line items table; empty string only if truly not visible",
+      "line_total": "line total including VAT as plain number — only fill this if the invoice explicitly shows a VAT-inclusive amount per line; otherwise empty string"
     }
   ]
 }
 
 Rules:
 - Extract ALL line items including free/sample items, delivery, and shipping charges.
+- UAE/GCC invoices typically show line amounts BEFORE VAT — put those values in line_total_excl_vat.
 - total_discount is the summary-level discount shown on the invoice.
 - discount_pct is the percent column in the line items table.
 - discount_amount is the calculated discount money amount per line if shown, else empty string.
 - If only discount percent is shown and not the amount, leave discount_amount empty.
 - If only discount amount is shown and not the percent, leave discount_pct empty.
+- qty must be a plain number only — never include unit text like "KG" or "PCS" in qty.
 - Numbers must be plain digits with decimal point; no currency symbols and no commas.
 - Keep product descriptions exactly as printed on the invoice.
 - Use empty string for any value not visible on the invoice.
@@ -1239,18 +1245,11 @@ def openai_image_parts_with_pillow(content: bytes, ext: str) -> list[dict[str, A
     except Exception:
         return []
     try:
-        frames: list[dict[str, Any]] = []
         with Image.open(io.BytesIO(content)) as image:
-            while True:
-                frame = image.copy().convert("RGB")
-                output = io.BytesIO()
-                frame.save(output, format="PNG")
-                frames.append(openai_image_part(output.getvalue(), "image/png"))
-                try:
-                    image.seek(image.tell() + 1)
-                except EOFError:
-                    break
-        return frames
+            frame = image.copy().convert("RGB")
+            output = io.BytesIO()
+            frame.save(output, format="PNG")
+            return [openai_image_part(output.getvalue(), "image/png")]
     except Exception:
         return []
 
@@ -1307,6 +1306,22 @@ def call_openai_invoice_extractor(api_key: str, parts: list[dict[str, Any]]) -> 
     return parsed if isinstance(parsed, dict) else {}
 
 
+_JUNK_PRODUCT_RE = re.compile(
+    r"^(?:"
+    r"(?:AED|USD|EUR|GBP|SAR|QAR|BHD|KWD|OMR)\s*[\d,]+(?:\.\d+)?"  # currency amount e.g. AED1, AED 100.00
+    r"|[\d,]+(?:\.\d+)?\s*(?:AED|USD|EUR|GBP|SAR|QAR|BHD|KWD|OMR)"  # reversed e.g. 100 AED
+    r"|[\d,]+(?:\.\d+)?%?"  # pure number or percentage
+    r"|(?:sub\s*total|grand\s*total|net\s*total|total\s*excl|total\s*incl|vat\s*total|tax\s*total|amount\s*due|balance\s*due|total\s*payable|total\s*amount|total\s*due)"
+    r"|(?:vat|tax|discount|shipping|delivery|freight|handling|charges?|fees?|s&h)"
+    r")$",
+    re.IGNORECASE,
+)
+
+
+def _is_junk_product_description(desc: str) -> bool:
+    return bool(_JUNK_PRODUCT_RE.match(desc.strip()))
+
+
 def openai_invoice_to_purchase_rows(data: dict[str, Any]) -> list[dict[str, Any]]:
     items = data.get("line_items") if isinstance(data.get("line_items"), list) else []
     if not items:
@@ -1329,9 +1344,19 @@ def openai_invoice_to_purchase_rows(data: dict[str, Any]) -> list[dict[str, Any]
         if not isinstance(item, dict):
             continue
         product = str(item.get("description") or "").strip()
-        if not product:
+        if not product or _is_junk_product_description(product):
             continue
         line_net = line_nets[index] if index < len(line_nets) else Decimal("0")
+        raw_qty = decimal_value(item.get("qty"))
+        raw_unit_price = decimal_value(first_present_raw(item, "unit_price", "rate", "price", "unit_cost"))
+        raw_line_amount = decimal_value(
+            item.get("line_total_excl_vat") or item.get("line_total_before_vat")
+            or item.get("line_total") or item.get("line_subtotal")
+        )
+        # Skip rows with no financial data at all — these are header/label rows
+        # that the AI picked up as products (e.g. invoice title, column headers)
+        if not line_net and not raw_qty and not raw_unit_price and not raw_line_amount:
+            continue
         vat = Decimal("0")
         if vat_total:
             if net_sum:
@@ -1344,13 +1369,16 @@ def openai_invoice_to_purchase_rows(data: dict[str, Any]) -> list[dict[str, Any]
             "date": data.get("invoice_date") or "",
             "supplier": data.get("supplier") or "",
             "supplier_trn": data.get("trn_vat") or "",
+            "bill_to": data.get("bill_to") or "",
+            "currency": data.get("currency") or "AED",
             "product": product,
-            "quantity": item.get("qty") or 1,
+            "quantity": decimal_value(item.get("qty")) or 1,
             "unit": item.get("unit") or "PCS",
             "unit_cost": unit_cost,
             "unit_price": unit_cost,
             "cost": unit_cost,
             "discount": item.get("discount_pct") or "",
+            "discount_amount": item.get("discount_amount") or "",
             "discount_type": "Fixed" if discount_applies_to_subtotal else "None",
             "discount_value": data.get("total_discount") if discount_applies_to_subtotal else "",
             "vat_amount": vat,
@@ -1359,7 +1387,6 @@ def openai_invoice_to_purchase_rows(data: dict[str, Any]) -> list[dict[str, Any]
             "net_amount": line_net,
             "subtotal": line_net,
             "tax_type": "VAT 5%" if vat_total else "None",
-            "notes": f"AI extraction currency: {data.get('currency') or 'AED'}",
             "raw": item,
         }))
     return rows
@@ -1385,10 +1412,12 @@ def openai_line_net_amounts(
     vat_total: Decimal,
     total_payable: Decimal,
 ) -> list[Decimal]:
+    # Priority 1: explicit pre-VAT amounts (line_total_excl_vat etc.)
     explicit_nets = [openai_explicit_line_net_amount(item) if isinstance(item, dict) else Decimal("0") for item in items]
     if any(explicit_nets):
         return explicit_nets
 
+    # Priority 2: gross line_total values from AI
     gross_values = [openai_line_gross_amount(item) if isinstance(item, dict) else Decimal("0") for item in items]
     gross_sum = sum(gross_values, Decimal("0"))
     if gross_sum:
@@ -1396,12 +1425,20 @@ def openai_line_net_amounts(
         if not target_net and total_payable and vat_total:
             target_net = max(Decimal("0"), total_payable - vat_total)
         if target_net:
+            # If the AI's line_total values already sum to ≈ the pre-VAT subtotal,
+            # they are pre-VAT amounts — use them directly (common on UAE/GCC invoices).
+            tolerance = max(target_net * Decimal("0.02"), Decimal("0.50"))
+            if abs(gross_sum - target_net) <= tolerance:
+                return gross_values
             return distribute_by_weight(target_net, gross_values)
 
-        if vat_total:
-            return [max(Decimal("0"), gross - (vat_total * (gross / gross_sum))) for gross in gross_values]
-        return gross_values
+        # No subtotal available — if no VAT, line_totals are the net amounts
+        if not vat_total:
+            return gross_values
+        # VAT present but no subtotal: back-calculate per line (risky — only last resort)
+        return [max(Decimal("0"), gross - (vat_total * (gross / gross_sum))) for gross in gross_values]
 
+    # Priority 3: calculate from unit_price × qty
     calculated = [openai_line_net_from_unit_price(item) if isinstance(item, dict) else Decimal("0") for item in items]
     return calculated
 
@@ -1459,9 +1496,14 @@ def openai_unit_price(item: dict[str, Any], line_net: Decimal) -> Any:
     if raw.lower() == "free":
         return 0
     value = decimal_value(raw)
-    if value:
-        return value
     qty = first_decimal_value(item, "qty", "quantity") or Decimal("1")
+    if value:
+        # If unit_price × qty exceeds the computed line net by more than 10%, the AI
+        # has placed a summary total (e.g. invoice grand total) in the unit_price field.
+        # Fall back to line_net / qty in that case.
+        if line_net and value * qty > line_net * Decimal("1.1"):
+            return line_net / qty if qty else line_net
+        return value
     return line_net / qty if qty else line_net
 
 
@@ -2173,6 +2215,8 @@ PURCHASE_FIELD_ALIASES = {
     ),
     "date": ("date", "invoice_date", "bill_date", "purchase_date", "voucher_date", "entry_date"),
     "supplier": ("supplier", "vendor", "vendor_name", "supplier_name", "party", "party_name"),
+    "bill_to": ("bill_to", "buyer", "customer", "client", "bill_to_name", "customer_name", "buyer_name"),
+    "currency": ("currency", "currency_code", "curr"),
     "address": ("address", "supplier_address", "vendor_address", "billing_address", "bill_to_address"),
     "pay_term": ("pay_term", "payment_term", "payment_terms", "terms", "credit_terms"),
     "supplier_trn": ("supplier_trn", "vendor_trn", "trn", "tax_registration_number", "vat_no", "vat_number"),
@@ -2294,6 +2338,8 @@ def build_purchase_invoices_from_rows(
                 "invoice_no": invoice_no,
                 "date": excel_date_value(row.get("date")),
                 "supplier": supplier,
+                "bill_to": str(row.get("bill_to") or ""),
+                "currency": str(row.get("currency") or "AED"),
                 "address": str(row.get("address") or ""),
                 "pay_term": str(row.get("pay_term") or ""),
                 "supplier_trn": str(row.get("supplier_trn") or ""),
@@ -2328,6 +2374,7 @@ def build_purchase_invoices_from_rows(
                 "quantity": float(quantity),
                 "unit_cost": float(unit_cost),
                 "discount_percent": float(discount_percent),
+                "discount_amount": float(decimal_value(row.get("discount_amount"))),
                 "unit_cost_before_tax": float(unit_cost_before_tax),
                 "line_total": float(line_total),
                 "profit_margin": float(decimal_value(row.get("profit_margin"))),
@@ -2397,13 +2444,36 @@ def merge_purchase_invoices(invoices: list[dict[str, Any]], filename: str = "") 
             product = str(line.get("product") or line.get("description") or line.get("sku") or "").strip().lower()
             amount = decimal_value(line.get("line_total") or line.get("amount"))
             qty = decimal_value(line.get("quantity") or line.get("qty"))
-            if not any(
-                str(existing.get("product") or existing.get("description") or existing.get("sku") or "").strip().lower() == product
-                and decimal_value(existing.get("line_total") or existing.get("amount")) == amount
-                and decimal_value(existing.get("quantity") or existing.get("qty")) == qty
-                for existing in target["lines"]
-            ):
-                target["lines"].append(line)
+
+            def _ascii_score(s: str) -> int:
+                return len("".join(c for c in s if "\x20" <= c <= "\x7e").strip())
+
+            exact_dup = any(
+                str(ex.get("product") or ex.get("description") or ex.get("sku") or "").strip().lower() == product
+                and decimal_value(ex.get("line_total") or ex.get("amount")) == amount
+                and decimal_value(ex.get("quantity") or ex.get("qty")) == qty
+                for ex in target["lines"]
+            )
+            if exact_dup:
+                continue
+
+            # Bilingual duplicate: same qty + same amount but different name (Arabic vs English)
+            bilingual_idx = next(
+                (
+                    i for i, ex in enumerate(target["lines"])
+                    if decimal_value(ex.get("quantity") or ex.get("qty")) == qty > 0
+                    and decimal_value(ex.get("line_total") or ex.get("amount")) == amount > 0
+                ),
+                -1,
+            )
+            if bilingual_idx >= 0:
+                existing_name = str(target["lines"][bilingual_idx].get("product") or target["lines"][bilingual_idx].get("description") or "")
+                # Prefer the description with more ASCII chars (English over Arabic)
+                if _ascii_score(product) > _ascii_score(existing_name.lower()):
+                    target["lines"][bilingual_idx] = {**target["lines"][bilingual_idx], "product": product, "description": product}
+                continue
+
+            target["lines"].append(line)
     merged = []
     for invoice in grouped.values():
         line_total = sum((decimal_value(line.get("line_total") or line.get("amount")) for line in invoice.get("lines") or []), Decimal("0"))

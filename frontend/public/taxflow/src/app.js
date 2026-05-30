@@ -1,4 +1,4 @@
-const META={dashboard:{t:'Dashboard',s:'Loading dashboard from database',a:'',ao:null},company:{t:'Company Registration',s:'UAE Trade License & FTA Details',a:'Save All',ao:()=>toast('All changes saved','ok')},sales:{t:'Sales & Invoices',s:'Upload - AI Extraction - Validation - Invoices',a:'+ New Invoice',ao:()=>{go('sales');setTimeout(()=>stab(document.querySelectorAll('#page-sales .tab')[4],'s-create'),50)}},purchase:{t:'Purchases',s:'Upload - AI Extraction - Validation',a:'Upload Files',ao:()=>document.getElementById('pur-file').click()},bank:{t:'Bank & Payments',s:'Accounts - transactions - receipts - payments - reconciliation',a:'+ Record Payment',ao:()=>openPaymentModal('Customer Receipt')},inventory:{t:'Inventory',s:'Stock - Items - Movements',a:'+ Add Item',ao:()=>openInventoryItemModal()},expense:{t:'Expenses',s:'List - Create - Approvals',a:'+ New Expense',ao:()=>{go('expense');setTimeout(()=>stab(document.querySelectorAll('#page-expense .tab')[1],'exp-create'),50)}},accounting:{t:'Accounting',s:'Chart - Journal - Ledger',a:'+ New Entry',ao:()=>showM('m-acc')},reports:{t:'Reports',s:'VAT - P&L - Trial Balance',a:'Export PDF',ao:()=>toast('Exporting report...','info')},settings:{t:'Settings',s:'General - Users - Tax',a:'Save All',ao:()=>toast('Settings saved','ok')},staff:{t:'Staff Management',s:'Attendance - Leave - Corrections - Biometric',a:'+ Add Employee',ao:()=>showM('m-emp')},expert:{t:'Expert Review',s:'Find CA experts - Submit for review',a:'+ New Request',ao:()=>showM('m-newreview')},design:{t:'System Design',s:'Functional Spec - Fields - Validations - API',a:'Export Spec',ao:()=>toast('Exporting FRD to PDF...','info')}};
+const META={dashboard:{t:'Dashboard',s:'Loading dashboard from database',a:'',ao:null},company:{t:'Company Registration',s:'UAE Trade License & FTA Details',a:'Save All',ao:()=>toast('All changes saved','ok')},sales:{t:'Sales & Invoices',s:'Upload - AI Extraction - Validation - Invoices',a:'+ New Invoice',ao:()=>{go('sales');setTimeout(()=>stab(document.querySelectorAll('#page-sales .tab')[4],'s-create'),50)}},purchase:{t:'Purchases',s:'Upload - AI Extraction - Validation',a:'Upload Files',ao:()=>document.getElementById('pur-file').click()},bank:{t:'Bank & Payments',s:'Accounts - transactions - receipts - payments - reconciliation',a:'+ Record Payment',ao:()=>openPaymentModal('Customer Receipt')},inventory:{t:'Inventory',s:'Stock - Items - Movements',a:'+ Add Item',ao:()=>openInventoryItemModal()},expense:{t:'Expenses',s:'AI Upload - Create - Approvals - List',a:'+ New Expense',ao:()=>{go('expense');setTimeout(()=>stab(document.querySelectorAll('#page-expense .tab')[1],'exp-create'),50)}},accounting:{t:'Accounting',s:'Chart - Journal - Ledger',a:'+ New Entry',ao:()=>showM('m-acc')},reports:{t:'Reports',s:'VAT - P&L - Trial Balance',a:'Export PDF',ao:()=>toast('Exporting report...','info')},settings:{t:'Settings',s:'General - Users - Tax',a:'Save All',ao:()=>toast('Settings saved','ok')},staff:{t:'Staff Management',s:'Attendance - Leave - Corrections - Biometric',a:'+ Add Employee',ao:()=>showM('m-emp')},expert:{t:'Expert Review',s:'Find CA experts - Submit for review',a:'+ New Request',ao:()=>showM('m-newreview')},design:{t:'System Design',s:'Functional Spec - Fields - Validations - API',a:'Export Spec',ao:()=>toast('Exporting FRD to PDF...','info')}};
 META.settings={t:'Settings',s:'Company - Users - Tax - Security - Integrations - Invoice Design',a:'Save All',ao:()=>toast('Settings saved','ok')};
 META.payroll={t:'Payroll',s:'Salary run - WPS/SIF - Payslips - Posting',a:'Run Payroll',ao:()=>{go('payroll');setTimeout(()=>runPayroll(),50)}};
 META.sales={t:'Sales & Invoices',s:'Upload - AI Extraction - Validation - Invoices',a:'+ New',ao:()=>openSalesAddChoice()};
@@ -587,7 +587,7 @@ function openEmployeeProfile(btn){
       <div class="g4 mb16">
         <div class="stat"><div class="stat-lbl">Department</div><div class="stat-val" style="font-size:18px;color:var(--accent)">${escapeHtml(employee.department||'-')}</div></div>
         <div class="stat"><div class="stat-lbl">Shift</div><div class="stat-val" style="font-size:18px;color:var(--green)">${escapeHtml(employee.shift||'-')}</div></div>
-        <div class="stat"><div class="stat-lbl">Basic Salary</div><div class="stat-val" style="font-size:18px;color:var(--purple)">AED ${Number(employee.salary||0).toLocaleString('en-AE')}</div></div>
+        <div class="stat"><div class="stat-lbl">Basic Salary</div><div class="stat-val" style="font-size:18px;color:var(--purple)">${'AED'} ${Number(employee.salary||0).toLocaleString('en-AE')}</div></div>
         <div class="stat"><div class="stat-lbl">Supervisor</div><div class="stat-val" style="font-size:18px;color:var(--amber)">${escapeHtml(employee.supervisor||'-')}</div></div>
       </div>
       <div class="g2 mb16">
@@ -1470,7 +1470,14 @@ async function authenticatedFetch(url,options={}){
   return response;
 }
 
+const AED_SYMBOL='AED';
+const AED_HTML='AED';
+function AED_SYMBOL_SVG(){return 'AED';}
 function formatAed(value){
+  const num=Number(value||0);
+  return 'AED '+num.toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+function formatAedHtml(value){
   const num=Number(value||0);
   return 'AED '+num.toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2});
 }
@@ -1688,54 +1695,139 @@ function renderFullDashboardFromDatabase(data){
 }
 
 function renderDashboardHero(data,kpis={},counts={}){
-  const totalRecords=Object.entries(counts||{})
-    .filter(([key])=>key.endsWith('_count'))
-    .reduce((sum,[,value])=>sum+Number(value||0),0);
-  const staffTotal=Number(kpis.staff_total||0);
-  const staffPresent=Number(kpis.staff_present||0);
-  const openInvoices=Number(kpis.open_invoice_count||0);
-  const taxLines=Number(counts.tax_line_count||0);
-  const readiness=Math.max(0,Math.min(100,Math.round(
-    56+
-    (totalRecords>0?16:0)+
-    (taxLines>0?10:0)+
-    (staffTotal>0?8:0)+
-    (openInvoices===0?10:4)
-  )));
-  const score=document.getElementById('dash-hero-score');
-  const records=document.getElementById('dash-hero-records');
-  const vat=document.getElementById('dash-hero-vat');
-  const open=document.getElementById('dash-hero-open');
-  if(score)score.textContent=`${readiness}%`;
-  if(records)records.textContent=totalRecords.toLocaleString('en-AE');
-  if(vat)vat.textContent=formatAed(kpis.vat_payable||data.vat_payable||0);
-  if(open)open.textContent=formatAed(kpis.open_invoice_amount||0);
-  document.documentElement.style.setProperty('--dash-readiness',`${readiness}%`);
+  // Header
+  const dateEl=document.getElementById('dash-today-date');
+  if(dateEl)dateEl.textContent=new Date().toLocaleDateString('en-AE',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  const periodEl=document.getElementById('dash-period-label');
+  if(periodEl)periodEl.textContent=`Live · ${data.period||new Date().toLocaleDateString('en-AE',{month:'long',year:'numeric'})}`;
+  const greet=document.getElementById('dash-greeting');
+  if(greet){const h=new Date().getHours();greet.textContent=h<12?'Good morning':h<17?'Good afternoon':'Good evening';}
+
+  const revenue=parseAmount(kpis.total_revenue||data.total_revenue||0);
+  const purchases=parseAmount(kpis.total_purchases||data.total_purchases||0);
+  const vatPayable=parseAmount(kpis.vat_payable||data.vat_payable||0);
+  const grossProfit=revenue-purchases;
+
+  // KPI cards
+  const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
+  set('dash-revenue',formatAed(revenue));
+  set('dash-revenue-sub',`${Number(kpis.invoice_count||0)} invoices`);
+  set('dash-total-purchases',formatAed(purchases));
+  set('dash-purchases-sub',`${Number(kpis.purchase_count||counts.purchase_record_count||0)} records`);
+  set('dash-vat',formatAed(vatPayable));
+  set('dash-vat-sub',vatPayable>0?'Payable to FTA':'Credit position');
+  set('dash-gross-profit',formatAed(grossProfit));
+  set('dash-profit-sub',revenue?`${Math.round(grossProfit/revenue*100)}% margin`:'—');
+
+  // Trend badges
+  const setTrend=(id,val)=>{
+    const el=document.getElementById(id);
+    if(!el)return;
+    if(val>0){el.textContent=`↑ ${val}%`;el.className='dash-kpi-trend up';}
+    else if(val<0){el.textContent=`↓ ${Math.abs(val)}%`;el.className='dash-kpi-trend dn';}
+    else{el.textContent='—';el.className='dash-kpi-trend';}
+  };
+  setTrend('dash-rev-trend',Number(kpis.revenue_trend||0));
+  setTrend('dash-pur-trend',Number(kpis.purchase_trend||0));
+  setTrend('dash-profit-trend',Number(kpis.profit_trend||0));
+
+  // Sparklines (mini bar charts from monthly data)
+  const monthly=data.monthly_revenue_vat||[];
+  if(monthly.length){
+    renderDashSparkline('dash-rev-spark',monthly.map(r=>Number(r.sales||0)),'#6366f1');
+    renderDashSparkline('dash-pur-spark',monthly.map(r=>Number(r.purchases||0)),'#ef4444');
+    renderDashSparkline('dash-profit-spark',monthly.map(r=>Number(r.sales||0)-Number(r.purchases||0)),'#10b981');
+    renderDashSparkline('dash-vat-spark',monthly.map(r=>Number(r.net_vat||0)),'#f59e0b');
+  }
+
+  // AR / AP
+  const arPending=parseAmount(kpis.open_invoice_amount||0);
+  const arCollected=parseAmount(kpis.collected_amount||0);
+  const arGross=arPending+arCollected;
+  const arPct=arGross>0?Math.round(arCollected/arGross*100):0;
+  set('dash-ar-total',formatAed(arGross));
+  set('dash-ar-count',`${Number(kpis.open_invoice_count||0)} invoices`);
+  set('dash-ar-pct-collected',`${arPct}%`);
+  set('dash-ar-pending',formatAed(arPending));
+  set('dash-ar-collected-amt',formatAed(arCollected));
+  // AR ring — circumference r=19 ≈ 120
+  const arRing=document.getElementById('dash-ar-ring');
+  if(arRing)arRing.setAttribute('stroke-dasharray',`${Math.round(arPct/100*120)} 120`);
+
+  const apTotal=parseAmount(kpis.total_payable||purchases);
+  const apPaid=parseAmount(kpis.total_paid||0);
+  const apDue=Math.max(0,apTotal-apPaid);
+  const apPct=apTotal>0?Math.round(apPaid/apTotal*100):0;
+  set('dash-ap-total',formatAed(apTotal));
+  set('dash-ap-count',`${Number(counts.purchase_record_count||0)} bills`);
+  set('dash-ap-pct-paid',`${apPct}%`);
+  set('dash-ap-due',formatAed(apDue));
+  set('dash-ap-paid-amt',formatAed(apPaid));
+  const apRing=document.getElementById('dash-ap-ring');
+  if(apRing)apRing.setAttribute('stroke-dasharray',`${Math.round(apPct/100*120)} 120`);
+
+  // VAT ring
+  renderDashVatRing(data,kpis);
+}
+
+function renderDashSparkline(id,values,color){
+  const el=document.getElementById(id);
+  if(!el||!values.length)return;
+  const max=Math.max(1,...values.map(Math.abs));
+  el.innerHTML=values.map(v=>{
+    const h=Math.max(3,Math.round((Math.abs(v)/max)*28));
+    return `<div class="dash-spark-bar" style="height:${h}px;background:${color};opacity:${v<0?.4:1}"></div>`;
+  }).join('');
+}
+
+function renderDashVatRing(data,kpis={}){
+  const outputVat=parseAmount(kpis.output_vat||data.output_vat||0);
+  const inputVat=parseAmount(kpis.input_vat||data.input_vat||0);
+  const netVat=outputVat-inputVat;
+  const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
+  set('dash-vat-output',formatAed(outputVat));
+  set('dash-vat-input',formatAed(inputVat));
+  set('dash-vat-net',formatAed(Math.abs(netVat)));
+  const badge=document.getElementById('dash-vat-status-badge');
+  if(badge){badge.textContent=netVat>0?'Payable':netVat<0?'Refund':'Balanced';badge.className=netVat>0?'b b-a':netVat<0?'b b-g':'b b-b';}
+  // SVG donut r=38 → circ≈239
+  const circ=239;
+  const vatTotal=Math.max(1,outputVat+inputVat);
+  const outDash=Math.round(outputVat/vatTotal*circ);
+  const inDash=Math.round(inputVat/vatTotal*circ);
+  const outRing=document.getElementById('dash-vat-ring-output');
+  const inRing=document.getElementById('dash-vat-ring-input');
+  if(outRing)outRing.setAttribute('stroke-dasharray',`${outDash} ${circ-outDash}`);
+  if(inRing){inRing.setAttribute('stroke-dasharray',`${inDash} ${circ-inDash}`);inRing.setAttribute('stroke-dashoffset',`${60+outDash}`);}
 }
 
 function renderMonthlyRevenueVat(rows){
   const bars=document.getElementById('dash-monthly-bars');
   const summary=document.getElementById('dash-monthly-summary');
   if(!bars||!summary)return;
-  const safeRows=rows.length?rows:[{period:'Current',sales:0,purchases:0,output_vat:0,input_vat:0,net_vat:0}];
-  const max=Math.max(1,...safeRows.map(row=>Number(row.sales||0)));
+  const safeRows=rows.length?rows.slice(-6):[{period:'Current',sales:0,purchases:0,output_vat:0,input_vat:0,net_vat:0}];
+  const maxVal=Math.max(1,...safeRows.flatMap(r=>[Number(r.sales||0),Number(r.purchases||0)]));
+  bars.style.gridTemplateColumns=`repeat(${safeRows.length},1fr)`;
   bars.innerHTML=safeRows.map(row=>{
-    const height=Math.max(8,Math.round((Number(row.sales||0)/max)*88));
-    const vatHeight=Math.max(5,Math.round((Math.abs(Number(row.net_vat||0))/max)*88));
-    return `
-      <div class="dash-month-col">
-        <div class="dash-month-bars">
-          <div class="bar sales" title="${escapeHtml(formatAed(row.sales))}" style="height:${height}px"></div>
-          <div class="bar vat" title="${escapeHtml(formatAed(row.net_vat))}" style="height:${vatHeight}px"></div>
-        </div>
-        <div class="dash-month-label">${escapeHtml(row.period)}</div>
-      </div>`;
+    const rH=Math.max(4,Math.round((Number(row.sales||0)/maxVal)*106));
+    const pH=Math.max(4,Math.round((Number(row.purchases||0)/maxVal)*106));
+    const vH=Math.max(3,Math.round((Math.abs(Number(row.net_vat||0))/maxVal)*106));
+    return `<div class="dv2-bar-group">
+      <div class="dv2-bar-cols">
+        <div class="dv2-bar-col" style="height:${rH}px;background:linear-gradient(to top,#4f46e5,#818cf8)" title="Revenue: ${escapeHtml(formatAed(row.sales))}"></div>
+        <div class="dv2-bar-col" style="height:${pH}px;background:linear-gradient(to top,#dc2626,#f87171)" title="Purchases: ${escapeHtml(formatAed(row.purchases))}"></div>
+        <div class="dv2-bar-col" style="height:${vH}px;background:linear-gradient(to top,#d97706,#fbbf24)" title="VAT: ${escapeHtml(formatAed(row.net_vat))}"></div>
+      </div>
+      <div class="dv2-bar-lbl">${escapeHtml(row.period)}</div>
+    </div>`;
   }).join('');
-  const latest=safeRows[safeRows.length-1]||{};
+  const totalSales=safeRows.reduce((s,r)=>s+Number(r.sales||0),0);
+  const totalPurch=safeRows.reduce((s,r)=>s+Number(r.purchases||0),0);
+  const totalVat=safeRows.reduce((s,r)=>s+Number(r.net_vat||0),0);
   summary.innerHTML=`
-    <div class="dash-month-metric"><div class="mono sales">${escapeHtml(formatAed(latest.sales||0))}</div><span>Output Sales</span></div>
-    <div class="dash-month-metric"><div class="mono purchases">${escapeHtml(formatAed(latest.purchases||0))}</div><span>Purchases</span></div>
-    <div class="dash-month-metric"><div class="mono vat">${escapeHtml(formatAed(latest.net_vat||0))}</div><span>Net VAT</span></div>
+    <div class="dv2-chart-metric"><div class="val" style="color:#6366f1">${escapeHtml(formatAed(totalSales))}</div><div class="lbl">Total Revenue</div></div>
+    <div class="dv2-chart-metric"><div class="val" style="color:#ef4444">${escapeHtml(formatAed(totalPurch))}</div><div class="lbl">Total Purchases</div></div>
+    <div class="dv2-chart-metric"><div class="val" style="color:#f59e0b">${escapeHtml(formatAed(totalVat))}</div><div class="lbl">Net VAT</div></div>
   `;
 }
 
@@ -1754,12 +1846,26 @@ function renderRecentActivity(rows){
 }
 
 function renderTopCustomers(rows){
+  // Legacy table (hidden, kept for compat)
   const tbody=document.getElementById('dash-top-customers');
-  if(!tbody)return;
-  tbody.innerHTML=rows.length
-    ? rows.map(row=>`<tr><td>${escapeHtml(row.name)}</td><td class="mono" style="text-align:right;color:var(--accent)">${escapeHtml(formatAed(row.total))}</td></tr>`).join('')
-    : '<tr><td colspan="2" style="color:var(--text3)">No invoice customers in database.</td></tr>';
-  refreshEnhancedTable(tbody.closest('table'));
+  if(tbody){
+    tbody.innerHTML=rows.length
+      ? rows.map(row=>`<tr><td>${escapeHtml(row.name)}</td><td class="mono" style="text-align:right;color:var(--accent)">${escapeHtml(formatAed(row.total))}</td></tr>`).join('')
+      : '<tr><td colspan="2" style="color:var(--text3)">No invoice customers in database.</td></tr>';
+  }
+  // New v2 design
+  const v2=document.getElementById('dash-top-customers-v2');
+  if(!v2)return;
+  const colors=['#6366f1','#ef4444','#f59e0b','#10b981','#8b5cf6'];
+  if(!rows.length){v2.innerHTML='<div class="dv2-loading">No customers in database yet.</div>';return;}
+  v2.innerHTML=rows.slice(0,5).map((row,i)=>{
+    const initials=(row.name||'?').split(/\s+/).map(w=>w[0]).join('').slice(0,2).toUpperCase();
+    return `<div class="dv2-customer-row">
+      <div class="dv2-customer-av" style="background:${colors[i%colors.length]}">${escapeHtml(initials)}</div>
+      <div class="dv2-customer-name">${escapeHtml(row.name)}</div>
+      <div class="dv2-customer-amt">${escapeHtml(formatAed(row.total))}</div>
+    </div>`;
+  }).join('');
   refreshPurchaseProductSuggestions();
 }
 
@@ -1767,13 +1873,20 @@ function renderInvoiceStatus(status){
   const target=document.getElementById('dash-invoice-status');
   if(!target)return;
   const rows=[
-    ['Paid',status.paid,'b-g','var(--green)'],
-    ['Pending',status.pending,'b-a','var(--amber)'],
-    ['Overdue',status.overdue,'b-r','var(--red)']
+    ['Paid',status.paid,'#10b981'],
+    ['Pending',status.pending,'#f59e0b'],
+    ['Overdue',status.overdue,'#ef4444']
   ];
-  target.innerHTML=rows.map(([label,row,badge,bar],index)=>{
+  target.innerHTML=rows.map(([label,row,color])=>{
     const item=row||{count:0,percentage:0};
-    return `<div style="${index<rows.length-1?'margin-bottom:10px':''}"><div class="flx-b mb12"><span style="font-size:12.5px">${label}</span><span class="b ${badge}">${Number(item.count||0)} invoices</span></div><div class="prog-bar"><div class="prog-fill" style="width:${Math.min(100,Number(item.percentage||0))}%;background:${bar}"></div></div></div>`;
+    const pct=Math.min(100,Number(item.percentage||0));
+    return `<div class="dv2-status-row">
+      <div class="dv2-status-top">
+        <span>${label}</span>
+        <span style="font-family:'DM Mono',monospace;font-size:11.5px;color:${color}">${Number(item.count||0)} invoices</span>
+      </div>
+      <div class="dv2-status-bar"><div class="dv2-status-fill" style="width:${pct}%;background:${color}"></div></div>
+    </div>`;
   }).join('');
 }
 
@@ -1876,7 +1989,7 @@ function renderReportDashboard(report){
 
 function renderReceivableRiskMix(receivables){
   const donut=document.querySelector('#rep-dash .donut');
-  if(donut)donut.dataset.label=formatAed(receivables.label||0).replace('AED ','AED ');
+  if(donut)donut.dataset.label=formatAed(receivables.label||0);
   const rows=document.querySelectorAll('#rep-receivable-card .risk-row');
   (receivables.buckets||[]).forEach((bucket,index)=>{
     const row=rows[index];
@@ -2143,62 +2256,104 @@ function renderDatabaseDashboardSummary(data){
   const page=document.getElementById('page-dashboard');
   if(!page)return;
   const counts=data.module_counts||data;
-  const company=data.company||currentCompany||{};
   const meta=data.dashboard_meta||{};
   let card=document.getElementById('db-dashboard-summary');
   if(!card){
     card=document.createElement('div');
     card.id='db-dashboard-summary';
-    card.className='card mb16';
-    const firstStats=page.querySelector('.g4.mb16');
-    if(firstStats&&firstStats.nextSibling)page.insertBefore(card,firstStats.nextSibling);
-    else page.prepend(card);
+    card.className='af-card mb20';
+    page.appendChild(card);
   }
+
   const rows=[
-    {label:'Invoices',count:counts.invoice_count,page:'sales',tab:'s-invoices',icon:'INV',tone:'accent',group:'Revenue',copy:'Open sales invoice register'},
-    {label:'Customers',count:counts.customer_count,page:'sales',tab:'s-customers',icon:'CUS',tone:'green',group:'Revenue',copy:'Customer master from database'},
-    {label:'Products',count:counts.product_count,page:'sales',tab:'s-products',icon:'SKU',tone:'teal',group:'Revenue',copy:'Item and service catalogue'},
-    {label:'Quotations',count:counts.quotation_count,page:'quotations',tab:'q-list',icon:'QTN',tone:'purple',group:'Revenue',copy:'Quotation list connected to database'},
-    {label:'Purchases',count:counts.purchase_record_count,page:'purchase',tab:'p-records',icon:'PUR',tone:'amber',group:'Operations',copy:'Purchase register from database'},
-    {label:'Vendors',count:counts.vendor_count,page:'purchase',tab:'p-vendors',icon:'VEN',tone:'green',group:'Operations',copy:'Supplier and vendor master'},
-    {label:'Payments',count:counts.payment_count,page:'payments',icon:'PAY',tone:'accent',group:'Cash',copy:'Receipts and supplier payments'},
-    {label:'Accounts',count:counts.account_count,page:'accounting',tab:'acc-chart',icon:'COA',tone:'teal',group:'Finance',copy:'Chart of accounts'},
-    {label:'Vouchers',count:counts.journal_count,page:'accounting',tab:'acc-voucher',icon:'JV',tone:'purple',group:'Finance',copy:'Voucher entries and ledger'},
-    {label:'Source Transactions',count:counts.source_transaction_count,page:'purchase',tab:'p-records',icon:'SRC',tone:'amber',group:'Finance',copy:'Sales, purchase, and payment sources'},
-    {label:'Tax Codes',count:counts.tax_code_count,page:'settings',tab:'set-tax',icon:'VAT',tone:'green',group:'Compliance',copy:'VAT setup and tax rules'},
-    {label:'Tax Lines',count:counts.tax_line_count,page:'reports',tab:'rep-vat',icon:'TAX',tone:'red',group:'Compliance',copy:'VAT report lines'},
-    {label:'Inventory Mappings',count:counts.inventory_mapping_count,page:'inventory',tab:'inv-mapping',icon:'MAP',tone:'accent',group:'Operations',copy:'Product and stock mappings'},
-    {label:'Employees',count:counts.employee_count,page:'staff',tab:'staff-list',icon:'HR',tone:'purple',group:'People',copy:'Staff management'},
-    {label:'Documents',count:counts.document_count,page:'documents',icon:'DOC',tone:'green',group:'Control',copy:'Uploaded files and attachments'},
-    {label:'Audit Logs',count:counts.audit_count,page:'settings',tab:'set-backup',icon:'LOG',tone:'red',group:'Control',copy:'Backup and audit trail'}
+    {label:'Invoices',      count:counts.invoice_count,             page:'sales',      tab:'s-invoices',   icon:'INV', color:'c-accent', group:'Revenue'},
+    {label:'Customers',     count:counts.customer_count,            page:'sales',      tab:'s-customers',  icon:'CUS', color:'c-green',  group:'Revenue'},
+    {label:'Products',      count:counts.product_count,             page:'sales',      tab:'s-products',   icon:'SKU', color:'c-teal',   group:'Revenue'},
+    {label:'Quotations',    count:counts.quotation_count,           page:'quotations', tab:'q-list',       icon:'QTN', color:'c-purple', group:'Revenue'},
+    {label:'Purchases',     count:counts.purchase_record_count,     page:'purchase',   tab:'p-records',    icon:'PUR', color:'c-amber',  group:'Operations'},
+    {label:'Vendors',       count:counts.vendor_count,              page:'purchase',   tab:'p-vendors',    icon:'VEN', color:'c-green',  group:'Operations'},
+    {label:'Inv. Mappings', count:counts.inventory_mapping_count,   page:'inventory',  tab:'inv-mapping',  icon:'MAP', color:'c-teal',   group:'Operations'},
+    {label:'Payments',      count:counts.payment_count,             page:'payments',   tab:'',             icon:'PAY', color:'c-accent', group:'Cash'},
+    {label:'Accounts',      count:counts.account_count,             page:'accounting', tab:'acc-chart',    icon:'COA', color:'c-teal',   group:'Finance'},
+    {label:'Vouchers',      count:counts.journal_count,             page:'accounting', tab:'acc-voucher',  icon:'JV',  color:'c-purple', group:'Finance'},
+    {label:'Transactions',  count:counts.source_transaction_count,  page:'purchase',   tab:'p-records',    icon:'SRC', color:'c-amber',  group:'Finance'},
+    {label:'Tax Codes',     count:counts.tax_code_count,            page:'settings',   tab:'set-tax',      icon:'VAT', color:'c-green',  group:'Compliance'},
+    {label:'Tax Lines',     count:counts.tax_line_count,            page:'reports',    tab:'rep-vat',      icon:'TAX', color:'c-red',    group:'Compliance'},
+    {label:'Employees',     count:counts.employee_count,            page:'staff',      tab:'staff-list',   icon:'HR',  color:'c-purple', group:'People'},
+    {label:'Documents',     count:counts.document_count,            page:'documents',  tab:'',             icon:'DOC', color:'c-green',  group:'Control'},
+    {label:'Audit Logs',    count:counts.audit_count,               page:'settings',   tab:'set-backup',   icon:'LOG', color:'c-red',    group:'Control'}
   ];
-  const totalRecords=rows.reduce((sum,item)=>sum+Number(item.count||0),0);
+
+  const totalRecords=rows.reduce((s,r)=>s+Number(r.count||0),0);
+
+  // Group config: label, color, dist-bar color
+  const groupDef={
+    Revenue:   {color:'#6366f1',label:'Revenue'},
+    Operations:{color:'#f59e0b',label:'Operations'},
+    Cash:      {color:'#10b981',label:'Cash'},
+    Finance:   {color:'#2eb8b8',label:'Finance'},
+    Compliance:{color:'#3ecf8e',label:'Compliance'},
+    People:    {color:'#9b72f0',label:'People'},
+    Control:   {color:'#f06b6b',label:'Control'},
+  };
+
+  // Build distribution bar (one segment per group)
+  const groupTotals={};
+  rows.forEach(r=>{groupTotals[r.group]=(groupTotals[r.group]||0)+Number(r.count||0);});
+  const distBar=Object.entries(groupTotals).map(([g,n])=>{
+    const pct=totalRecords?Math.max(1,Math.round(n/totalRecords*100)):Math.round(100/Object.keys(groupTotals).length);
+    const color=(groupDef[g]||{}).color||'#888';
+    return `<div class="af-dist-seg" style="flex:${pct};background:${color}" title="${escapeHtml(g)}: ${n.toLocaleString('en-AE')} records"></div>`;
+  }).join('');
+
+  // Build groups
+  const grouped={};
+  rows.forEach(r=>{(grouped[r.group]=grouped[r.group]||[]).push(r);});
+
+  const groupsHtml=Object.entries(grouped).map(([groupName,items])=>{
+    const gDef=groupDef[groupName]||{color:'#888'};
+    const gTotal=items.reduce((s,r)=>s+Number(r.count||0),0);
+    const tilesHtml=items.map(item=>{
+      const n=Number(item.count||0);
+      const sharePct=totalRecords?Math.max(1,Math.round(n/totalRecords*100)):4;
+      return `<button class="af-tile ${escapeHtml(item.color)}" type="button"
+          onclick="openDashboardRecord('${escapeHtml(item.page)}','${escapeHtml(item.tab||'')}')"
+          aria-label="Open ${escapeHtml(item.label)}">
+        <div class="af-tile-top">
+          <div class="af-icon">${escapeHtml(item.icon)}</div>
+          <span class="af-arrow">↗</span>
+        </div>
+        <div class="af-count">${n.toLocaleString('en-AE')}</div>
+        <div class="af-label">${escapeHtml(item.label)}</div>
+        <div class="af-meter"><div class="af-meter-fill" style="width:${sharePct}%"></div></div>
+      </button>`;
+    }).join('');
+    return `<div class="af-group">
+      <div class="af-group-head">
+        <span class="af-group-label" style="color:${escapeHtml(gDef.color)};border-color:${escapeHtml(gDef.color)}22">${escapeHtml(groupName)}</span>
+        <div class="af-group-line"></div>
+        <span class="af-group-count">${gTotal.toLocaleString('en-AE')} records</span>
+      </div>
+      <div class="af-tiles">${tilesHtml}</div>
+    </div>`;
+  }).join('');
+
   card.innerHTML=`
-    <div class="card-hd app-function-hd">
-      <div>
-        <div class="card-title">App Functions</div>
-        <div class="card-sub">Live database count by functional area. Open a tile to jump to its module.</div>
+    <div class="af-header">
+      <div class="af-header-left">
+        <div class="af-title">App Functions</div>
+        <div class="af-sub">Live database counts · click any tile to open its module</div>
       </div>
-      <div class="app-function-meta">
-        <span class="b b-g">${escapeHtml(meta.status||'Database synced')}</span>
-        <span class="mono">${rows.length.toLocaleString('en-AE')} areas - ${totalRecords.toLocaleString('en-AE')} records</span>
+      <div class="af-header-right">
+        <span class="b b-g"><span class="live-dot"></span>${escapeHtml(meta.status||'Synced')}</span>
+        <div class="af-total-badge">
+          <div class="af-total-num">${totalRecords.toLocaleString('en-AE')}</div>
+          <div class="af-total-lbl">${rows.length} modules</div>
+        </div>
       </div>
     </div>
-    <div class="db-shortcuts app-function-grid">
-      ${rows.map(item=>`
-        <button class="db-shortcut app-function-tile ${escapeHtml(item.tone)}" type="button" onclick="openDashboardRecord('${escapeHtml(item.page)}','${escapeHtml(item.tab||'')}')" aria-label="Open ${escapeHtml(item.label)}" style="--tile-share:${totalRecords?Math.max(4,Math.round((Number(item.count||0)/totalRecords)*100)):4}%">
-          <span class="db-shortcut-icon">${escapeHtml(item.icon)}</span>
-          <span class="db-shortcut-body">
-            <span class="db-shortcut-top">
-              <span><em>${escapeHtml(item.group)}</em><strong>${escapeHtml(item.label)}</strong></span>
-              <span class="mono">${Number(item.count||0).toLocaleString('en-AE')}</span>
-            </span>
-            <span class="db-shortcut-copy">${escapeHtml(item.copy)}</span>
-            <span class="app-function-meter"><i></i></span>
-          </span>
-        </button>
-      `).join('')}
-    </div>
+    <div class="af-dist-bar">${distBar}</div>
+    <div class="af-groups">${groupsHtml}</div>
   `;
 }
 
@@ -2530,7 +2685,7 @@ function clearDemoCardsAndCounters(){
   setText('file-count-badge','0 files');
   document.querySelectorAll('.page:not(#page-dashboard) .stat-val').forEach(node=>{
     const current=node.textContent.trim();
-    node.textContent=/^AED/i.test(current)?'AED 0.00':'0';
+    node.textContent=/^AED/i.test(current)||current.startsWith(AED_SYMBOL)?'AED 0.00':'0';
   });
   document.querySelectorAll('.page:not(#page-dashboard) .stat-delta').forEach(node=>{node.textContent='';});
   document.querySelectorAll('button').forEach(button=>{
@@ -2656,7 +2811,7 @@ function renderCustomerRecord(customer){
   row.dataset.address=customer.address||'';
   row.dataset.email=customer.email||'';
   row.dataset.phone=customer.phone||'';
-  row.innerHTML=`<td>${escapeHtml(customer.name)}</td><td class="mono">${escapeHtml(customer.trn||'Not registered')}</td><td>${escapeHtml(customer.emirate||'Dubai')}</td><td>${escapeHtml(customer.email||customer.phone||'-')}</td><td class="mono" style="color:var(--accent)">AED 0</td><td><button class="btn btn-g btn-sm">View</button></td>`;
+  row.innerHTML=`<td>${escapeHtml(customer.name)}</td><td class="mono">${escapeHtml(customer.trn||'Not registered')}</td><td>${escapeHtml(customer.emirate||'Dubai')}</td><td>${escapeHtml(customer.email||customer.phone||'-')}</td><td class="mono" style="color:var(--accent)">${'AED'} 0</td><td><button class="btn btn-g btn-sm">View</button></td>`;
   removeEmptyState(tbody);
   tbody.prepend(row);
   refreshInvoiceCustomerOptions();
@@ -3426,6 +3581,180 @@ function saveBankAccount(){
   audit('Added bank account',record.bank,'Saved');
 }
 
+// ── Expense AI Upload ─────────────────────────────────────────
+const expAiFiles=[];
+
+function expAiDrop(e){
+  e.preventDefault();
+  document.getElementById('exp-ai-zone')?.classList.remove('dz-over');
+  const files=[...e.dataTransfer.files].filter(f=>/pdf|jpeg|jpg|png/i.test(f.type||f.name));
+  if(!files.length){toast('Upload PDF, JPEG or PNG receipt files','warn');return;}
+  expAiAddFiles(files);
+}
+
+function expAiUpload(input){
+  const files=[...input.files];
+  if(!files.length)return;
+  input.value='';
+  expAiAddFiles(files);
+}
+
+function expAiAddFiles(files){
+  files.forEach(file=>{
+    const entry={name:file.name,size:file.size,status:'Ready',id:Date.now()+Math.random()};
+    const reader=new FileReader();
+    reader.onload=e=>{entry.base64=e.target.result;};
+    reader.readAsDataURL(file);
+    expAiFiles.push(entry);
+  });
+  expAiRenderFileList();
+  toast(`${files.length} receipt(s) added. Click Extract Pending to process.`,'info');
+}
+
+function expAiRenderFileList(){
+  const list=document.getElementById('exp-ai-file-list');
+  const badge=document.getElementById('exp-ai-file-count');
+  if(badge)badge.textContent=`${expAiFiles.length} file${expAiFiles.length===1?'':'s'}`;
+  if(!list)return;
+  if(!expAiFiles.length){
+    list.innerHTML='<div style="font-size:12px;color:var(--text3);padding:10px 0">No receipts uploaded yet.</div>';
+    return;
+  }
+  const statusColor={Ready:'var(--text3)',Extracting:'var(--accent)',Done:'var(--green)',Error:'var(--red)'};
+  list.innerHTML=expAiFiles.map((f,i)=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(f.name)}</div>
+        <div style="font-size:11px;color:${statusColor[f.status]||'var(--text3)'}">${escapeHtml(f.status)}</div>
+      </div>
+      <button class="icon-btn danger" onclick="expAiRemoveFile(${i})">${deleteIconSvg()}</button>
+    </div>`).join('');
+}
+
+function expAiRemoveFile(i){
+  expAiFiles.splice(i,1);
+  expAiRenderFileList();
+}
+
+function toggleExpAiSelection(checked){
+  document.querySelectorAll('#exp-ai-tbody .expense-ai-select').forEach(box=>{box.checked=!!checked;});
+}
+
+async function runExpAiExtraction(){
+  const ready=expAiFiles.filter(f=>f.status==='Ready');
+  if(!ready.length){toast('No pending receipts to extract','warn');return;}
+  const prog=document.getElementById('exp-ai-extract-prog');
+  const fill=document.getElementById('exp-ai-ext-fill');
+  const pct=document.getElementById('exp-ai-ext-pct');
+  if(prog)prog.style.display='block';
+  let done=0;
+  for(const entry of ready){
+    entry.status='Extracting';
+    expAiRenderFileList();
+    try{
+      const payload={file:{name:entry.name,size:entry.size,base64:entry.base64}};
+      const resp=await authenticatedFetch(`${apiBaseUrl()}/app-data?action=documents.extract`,{method:'POST',body:JSON.stringify(payload)});
+      const data=resp.ok?await resp.json():null;
+      const invoices=Array.isArray(data)?data:(data?.invoices||[]);
+      entry.status='Done';
+      if(invoices.length)expAiRenderExtracted(invoices,entry.name);
+    }catch(err){
+      entry.status='Error';
+      toast(`Extraction failed for ${entry.name}: ${err.message}`,'warn');
+    }
+    done++;
+    if(fill)fill.style.width=`${Math.round(done/ready.length*100)}%`;
+    if(pct)pct.textContent=`${Math.round(done/ready.length*100)}%`;
+    expAiRenderFileList();
+  }
+  setTimeout(()=>{if(prog)prog.style.display='none';},800);
+  const statEl=document.getElementById('exp-ai-stat-extracted');
+  if(statEl)statEl.textContent=document.querySelectorAll('#exp-ai-tbody .exp-ai-card').length;
+}
+
+function expAiRenderExtracted(invoices,filename){
+  const tbody=document.getElementById('exp-ai-tbody');
+  if(!tbody)return;
+  if(tbody.querySelector('.ai-empty-state'))tbody.innerHTML='';
+  invoices.forEach(inv=>{
+    const lines=Array.isArray(inv.lines)?inv.lines:[];
+    const amount=parseAmount(inv.subtotal||inv.net_amount||0);
+    const vat=parseAmount(inv.vat_amount||inv.tax_amount||0);
+    const total=parseAmount(inv.total||amount+vat);
+    const card=document.createElement('div');
+    card.className='ai-extract-card exp-ai-card';
+    card.setAttribute('data-exp-inv',JSON.stringify({...inv,amount,vat,total,source_file:filename}));
+    card.innerHTML=`
+      <div class="ai-card-head">
+        <div class="ai-card-title-wrap">
+          <input type="checkbox" class="expense-ai-select" checked aria-label="Select receipt">
+          <div class="ai-pdf-icon"><span>REC</span></div>
+          <div>
+            <div class="ai-card-title mono">${escapeHtml(inv.invoice_no||filename||'Receipt')}</div>
+            <div class="ai-card-kicker">${escapeHtml(inv.supplier||'Supplier')}</div>
+          </div>
+        </div>
+      </div>
+      <div class="ai-invoice-divider"></div>
+      <div class="ai-invoice-fields">
+        <div><span>Date</span><strong>${escapeHtml(inv.date||'—')}</strong></div>
+        <div><span>Ref</span><strong class="mono">${escapeHtml(inv.invoice_no||'—')}</strong></div>
+        <div><span>Supplier</span><strong>${escapeHtml(inv.supplier||'—')}</strong></div>
+        <div><span>Total</span><strong class="mono">AED ${total.toLocaleString('en-AE',{minimumFractionDigits:2})}</strong></div>
+        <div><span>VAT</span><strong class="mono">AED ${vat.toLocaleString('en-AE',{minimumFractionDigits:2})}</strong></div>
+      </div>
+      <div class="ai-card-foot">
+        <div class="row-actions">
+          <button class="ai-card-action approve" onclick="expAiSaveOne(this)">Save</button>
+          <button class="ai-card-action delete" onclick="this.closest('.exp-ai-card').remove()">${deleteIconSvg()}</button>
+        </div>
+      </div>`;
+    tbody.insertBefore(card,tbody.firstChild);
+  });
+  const statEl=document.getElementById('exp-ai-stat-extracted');
+  if(statEl)statEl.textContent=document.querySelectorAll('#exp-ai-tbody .exp-ai-card').length;
+}
+
+function expAiSaveOne(btn){
+  const card=btn.closest('.exp-ai-card');
+  if(!card)return;
+  try{
+    const inv=JSON.parse(card.getAttribute('data-exp-inv')||'{}');
+    const record={
+      ref:`EXP-AI-${Date.now()}`,
+      date:inv.date||new Date().toISOString().slice(0,10),
+      category:'Supplies',
+      description:inv.supplier||(inv.lines?.[0]?.product)||'AI Extracted Expense',
+      amount:parseAmount(inv.subtotal||inv.net_amount||0),
+      vat:parseAmount(inv.vat_amount||inv.tax_amount||0),
+      total:parseAmount(inv.total||0),
+      status:'Pending',
+      source:'AI Upload',
+      supplier:inv.supplier||''
+    };
+    renderExpenseRecord(record);
+    saveServer('expenses',record);
+    card.remove();
+    toast('Expense saved from receipt','ok');
+  }catch(e){toast('Save failed: '+e.message,'warn');}
+}
+
+function saveExtractedExpenses(){
+  const cards=[...document.querySelectorAll('#exp-ai-tbody .exp-ai-card')].filter(c=>c.querySelector('.expense-ai-select')?.checked);
+  if(!cards.length){toast('No receipts selected to save','warn');return;}
+  cards.forEach(card=>expAiSaveOne(card.querySelector('.ai-card-action.approve')));
+}
+
+function setExpAiView(mode,btn){
+  if(btn){
+    btn.closest('.segmented')?.querySelectorAll('.seg').forEach(b=>b.classList.remove('on'));
+    btn.classList.add('on');
+  }
+  const tbody=document.getElementById('exp-ai-tbody');
+  if(tbody)tbody.className=`ai-card-grid${mode==='gallery'?' ai-gallery':''}`;
+}
+
+// ── end Expense AI Upload ─────────────────────────────────────
 function calcExpenseTotal(){
   const amount=parseAmount(document.getElementById('expense-amount')?.value);
   const vat=parseAmount(document.getElementById('expense-vat')?.value);
@@ -3539,7 +3868,7 @@ function saveExpense(status='Pending'){
   renderExpenseRecord(record);
   saveServer('expenses',record);
   clearExpenseForm();
-  stab(document.querySelector('#page-expense .tab:nth-child(1)'),'exp-list');
+  stab(document.querySelector('#page-expense .tab:nth-child(4)'),'exp-list');
   toast(status==='Draft'?'Expense draft saved':'Expense submitted for approval','ok');
   audit(status==='Draft'?'Saved expense draft':'Submitted expense',record.ref,'Saved');
 }
@@ -3558,7 +3887,7 @@ function buildPurchaseRecordRow(purchase){
   const statusClass=status==='Paid'?'b-g':status==='Received'?'b-b':status.includes('Payment')?'b-a':'b-gray';
   const source=String(purchase.source||'Manual');
   const sourceClass=source.toLowerCase().includes('ai')?'b-p':'b-gray';
-  row.innerHTML=`<td class="mono">${escapeHtml(ref)}</td><td>${escapeHtml(purchaseRecordProductSummary(normalizedPurchase))}</td><td>${escapeHtml(normalizedPurchase.supplier||'-')}</td><td>${escapeHtml(normalizedPurchase.date||'-')}</td><td>${escapeHtml(normalizedPurchase.location||'-')}</td><td class="mono">${Number(quantity||0).toLocaleString('en-AE',{maximumFractionDigits:4})}</td><td class="mono">${Number(normalizedPurchase.net_amount||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(normalizedPurchase.tax_amount||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(normalizedPurchase.shipping||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(normalizedPurchase.total||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(normalizedPurchase.paid||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(normalizedPurchase.due||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td><span class="b ${sourceClass}">${escapeHtml(source)}</span></td><td><span class="b ${statusClass}">${escapeHtml(status)}</span></td><td data-action-col="1"><div class="row-actions"><button class="icon-btn edit" type="button" title="Edit" aria-label="Edit purchase" onclick="editPurchaseRecord(this)">${editIconSvg()}</button><button class="icon-btn view" type="button" title="View" aria-label="View purchase" onclick="openPurchaseRecordPreview(this)">${viewIconSvg()}</button><button class="icon-btn danger" type="button" title="Delete" aria-label="Delete purchase" onclick="deletePurchaseRecord(this)">${deleteIconSvg()}</button></div></td>`;
+  row.innerHTML=`<td class="mono">${escapeHtml(ref)}</td><td>${escapeHtml(purchaseRecordProductSummary(normalizedPurchase))}</td><td>${escapeHtml(normalizedPurchase.supplier||'-')}</td><td>${escapeHtml(normalizedPurchase.date||'-')}</td><td>${escapeHtml(normalizedPurchase.location||'-')}</td><td class="mono">${Number(quantity||0).toLocaleString('en-AE',{maximumFractionDigits:4})}</td><td class="mono">${Number(normalizedPurchase.net_amount||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(normalizedPurchase.tax_amount||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(normalizedPurchase.shipping||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(normalizedPurchase.total||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(normalizedPurchase.paid||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(normalizedPurchase.due||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td><span class="b ${sourceClass}">${escapeHtml(source)}</span></td><td><span class="b ${statusClass}">${escapeHtml(status)}</span></td><td data-action-col="1"><div class="row-actions"><button class="icon-btn edit" type="button" title="Edit" aria-label="Edit purchase" onclick="editPurchaseRecord(this)">${editIconSvg()}</button><button class="icon-btn view" type="button" title="View" aria-label="View purchase" onclick="openPurchaseRecordPreview(this)">${viewIconSvg()}</button><button class="icon-btn copy" type="button" title="Copy" aria-label="Copy purchase" onclick="copyPurchaseRecord(this)">${copyIconSvg()}</button><button class="icon-btn danger" type="button" title="Delete" aria-label="Delete purchase" onclick="deletePurchaseRecord(this)">${deleteIconSvg()}</button></div></td>`;
   return row;
 }
 
@@ -3626,6 +3955,7 @@ function renderPurchaseRecordWindow(){
   window.__taxflowPurchaseRecordVisible=rendered;
   updatePurchaseRecordControls(total,rendered);
   refreshEnhancedTable(tbody.closest('table'));
+  renderLPOList();
   return {rendered,failed,total};
 }
 
@@ -4169,7 +4499,7 @@ function normalizeExtractedPurchaseInvoices(invoices=[],filename=''){
       });
     }
     const target=grouped.get(key);
-    ['date','supplier','supplier_trn','address','pay_term','payment_method','payment_account','payment_note','paid_on','shipping_details','notes','tax_type','discount_type','status','issues'].forEach(field=>{
+    ['date','supplier','supplier_trn','bill_to','currency','address','pay_term','payment_method','payment_account','payment_note','paid_on','shipping_details','notes','tax_type','discount_type','status','issues'].forEach(field=>{
       if(!target[field]&&inv[field])target[field]=inv[field];
     });
     target.confidence=Math.max(purchaseAiNumber(target.confidence),purchaseAiNumber(inv.confidence));
@@ -4183,12 +4513,29 @@ function normalizeExtractedPurchaseInvoices(invoices=[],filename=''){
       const product=purchaseAiProductName(line);
       const qty=purchaseAiNumber(line.quantity||line.qty);
       const amount=purchaseAiNumber(line.line_total||line.amount);
-      const duplicate=target.lines.some(existing=>
+      // Count ASCII printable chars — more ASCII = more likely English = preferred description
+      const asciiScore=s=>s.replace(/[^\x20-\x7E]/g,'').trim().length;
+      const exactDupIdx=target.lines.findIndex(existing=>
         purchaseAiProductName(existing).toLowerCase()===product.toLowerCase()&&
         purchaseAiNumber(existing.quantity||existing.qty)===qty&&
         purchaseAiNumber(existing.line_total||existing.amount)===amount
       );
-      if(!duplicate)target.lines.push(normalizePurchaseAiLine(line));
+      if(exactDupIdx>=0)return;
+      // Bilingual duplicate: same qty + same amount, different name (Arabic vs English)
+      const bilingualIdx=target.lines.findIndex(existing=>{
+        const eq=purchaseAiNumber(existing.quantity||existing.qty);
+        const ea=purchaseAiNumber(existing.line_total||existing.amount);
+        return eq>0&&qty>0&&eq===qty&&ea>0&&amount>0&&ea===amount;
+      });
+      if(bilingualIdx>=0){
+        // Prefer the description with more English (ASCII) characters
+        const existingName=purchaseAiProductName(target.lines[bilingualIdx]);
+        if(asciiScore(product)>asciiScore(existingName)){
+          target.lines[bilingualIdx]=normalizePurchaseAiLine({...target.lines[bilingualIdx],...line,product});
+        }
+        return;
+      }
+      target.lines.push(normalizePurchaseAiLine(line));
     });
   });
   return [...grouped.values()].map(inv=>{
@@ -4576,6 +4923,40 @@ function toggleSalesAiSelection(checked){
     const box=row.querySelector('.sales-ai-select');
     if(box&&row.dataset.skipped!=='1')box.checked=checked;
   });
+}
+
+function setSalesAiCardView(mode,btn){
+  if(btn){
+    btn.closest('.segmented')?.querySelectorAll('.seg').forEach(b=>b.classList.remove('on'));
+    btn.classList.add('on');
+  }
+}
+
+function applySalesAiSort(persist){
+  const sel=document.getElementById('sales-ai-sort');
+  const dir=(document.getElementById('sales-ai-sort-dir')?.dataset.dir||'asc')==='asc'?1:-1;
+  if(!sel)return;
+  const key=sel.value;
+  const tbody=document.getElementById('sales-ext-tbody');
+  if(!tbody)return;
+  const rows=[...tbody.querySelectorAll('tr[data-sales-inv]')];
+  rows.sort((a,b)=>{
+    const ia=JSON.parse(a.dataset.salesInv||'{}');
+    const ib=JSON.parse(b.dataset.salesInv||'{}');
+    const va=key==='total'?Number(ia.total||0):key==='date'?ia.date||'':key==='customer'?ia.customer||'':ia.invoice_no||'';
+    const vb=key==='total'?Number(ib.total||0):key==='date'?ib.date||'':key==='customer'?ib.customer||'':ib.invoice_no||'';
+    return (va<vb?-1:va>vb?1:0)*dir;
+  });
+  rows.forEach(r=>tbody.appendChild(r));
+}
+
+function toggleSalesAiSortDirection(){
+  const btn=document.getElementById('sales-ai-sort-dir');
+  if(!btn)return;
+  const newDir=btn.dataset.dir==='asc'?'desc':'asc';
+  btn.dataset.dir=newDir;
+  btn.textContent=newDir==='asc'?'Asc':'Desc';
+  applySalesAiSort(true);
 }
 
 function skipSalesAiRow(btn){
@@ -5108,7 +5489,7 @@ function quotationLayoutPreviewHtml(quote=sampleQuotationLayoutRecord(),layout=g
         <tbody>
           ${lines.slice(0,2).map(line=>`<tr><td><strong>${escapeHtml(line.description||line.item||'Item')}</strong></td><td class="mono num">${fmt(line.amount)}</td></tr>`).join('')}
           ${layout.showVat?`<tr><td>VAT 5%</td><td class="mono num">${fmt(vat)}</td></tr>`:''}
-          <tr><td style="font-weight:800">Total</td><td class="mono num" style="font-weight:800;color:var(--invoice-accent)">AED ${fmt(total)}</td></tr>
+          <tr><td style="font-weight:800">Total</td><td class="mono num" style="font-weight:800;color:var(--invoice-accent)">${'AED'} ${fmt(total)}</td></tr>
         </tbody>
       </table>
       <div class="invoice-summary-grid" style="grid-template-columns:1fr;gap:12px;padding:16px">
@@ -5635,7 +6016,7 @@ function renderSalesInvoicePreview(inv){
           <div class="invoice-meta-row"><span>${escapeHtml(labels.dueDate)}</span><strong>${escapeHtml(dueDate)}</strong></div>
           ${layout.showPaymentTerms?`<div class="invoice-meta-row"><span>${escapeHtml(labels.paymentTerms)}</span><strong>${escapeHtml(layout.terms||'Net 30')}</strong></div>`:''}
           ${invoiceRefs.map(([label,value])=>`<div class="invoice-meta-row"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join('')}
-          <div class="invoice-meta-row"><span>${escapeHtml(labels.currency)}</span><strong>AED</strong></div>
+          <div class="invoice-meta-row"><span>${escapeHtml(labels.currency)}</span><strong>${AED_SYMBOL}</strong></div>
         </div>
       </div>
 
@@ -5663,9 +6044,9 @@ function renderSalesInvoicePreview(inv){
           </div>`:''}
         </div>
         <div class="invoice-total-card">
-          ${layout.taxSummary?`<div class="invoice-total-row"><span>${escapeHtml(labels.subtotal)}</span><strong class="mono">AED ${fmt(subtotal)}</strong></div>
-          <div class="invoice-total-row"><span>${escapeHtml(labels.vat)} ${vatRate}%</span><strong class="mono">AED ${fmt(vat)}</strong></div>`:''}
-          <div class="invoice-grand"><span>${escapeHtml(labels.total)}</span><strong class="mono">AED ${fmt(total)}</strong></div>
+          ${layout.taxSummary?`<div class="invoice-total-row"><span>${escapeHtml(labels.subtotal)}</span><strong class="mono">${'AED'} ${fmt(subtotal)}</strong></div>
+          <div class="invoice-total-row"><span>${escapeHtml(labels.vat)} ${vatRate}%</span><strong class="mono">${'AED'} ${fmt(vat)}</strong></div>`:''}
+          <div class="invoice-grand"><span>${escapeHtml(labels.total)}</span><strong class="mono">${'AED'} ${fmt(total)}</strong></div>
           <div class="invoice-due"><span>${escapeHtml(labels.balanceDue)}</span><strong class="mono">AED ${fmt(balanceDue)}</strong></div>
         </div>
       </div>
@@ -5786,7 +6167,8 @@ function openSalesAddChoice(){
 function openPurchaseAddChoice(){
   showAddChoice('Purchase',[
     {title:'Purchase Invoice',sub:'Create a normal supplier purchase entry',action:"startPurchaseTransaction('purchase')"},
-    {title:'Purchase Return',sub:'Create a supplier return / debit note',action:"startPurchaseTransaction('return')"}
+    {title:'Purchase Return',sub:'Create a supplier return / debit note',action:"startPurchaseTransaction('return')"},
+    {title:'Local Purchase Order',sub:'Create a local purchase order for domestic suppliers',action:"startPurchaseTransaction('local_po')"}
   ]);
 }
 
@@ -6383,7 +6765,7 @@ async function extractSingleFile(entry){
     const extractionFailed=isExtractionErrorResult(invoices);
 
     entry.status=extractionFailed?'Error':'Extracted';
-    entry.invoices=normalizeExtractedPurchaseInvoices(invoices,entry.name);
+    entry.invoices=invoices;
     entry.savedInvoiceNos=entry.savedInvoiceNos||new Set();
     entry.extractedAt=new Date().toISOString();
     persistPurchaseDocumentRecord(entry);
@@ -6692,19 +7074,10 @@ function purchaseAiRowHtml(inv,line,index,validation){
     <div class="ai-invoice-fields">
       <div><span>Invoice Date</span><strong>${escapeHtml(inv.date||'No date')}</strong></div>
       <div><span>Invoice No</span><strong class="mono">${escapeHtml(inv.invoice_no||'Missing')}</strong></div>
-      <div><span>Supplier Name</span><strong>${escapeHtml(inv.supplier||'Supplier missing')}</strong></div>
-      <div><span>Total Due</span><strong class="mono">AED ${fmt(total)}</strong></div>
-      <div><span>Paid</span><strong class="mono ${paid>0?'paid-ok':'paid-due'}">AED ${fmt(paid)}</strong></div>
-    </div>
-    <div class="ai-card-product">
-      <div><span>Items</span><strong>${escapeHtml(product||'Extracted purchase item')}</strong></div>
-      <strong class="mono">${lineCount.toLocaleString('en-AE')} line${lineCount===1?'':'s'}</strong>
-    </div>
-    <div class="ai-card-kpis">
-      <div><span>Qty</span><strong class="mono">${qty.toLocaleString('en-AE',{maximumFractionDigits:4})}</strong></div>
-      <div><span>Line Total</span><strong class="mono accent">AED ${fmt(lineTotal)}</strong></div>
-      <div><span>VAT</span><strong class="mono">AED ${fmt(vat)}</strong></div>
-      <div><span>Gross Total</span><strong class="mono">AED ${fmt(total)}</strong></div>
+      <div><span>Supplier</span><strong>${escapeHtml(inv.supplier||'Supplier missing')}</strong></div>
+      <div><span>Supplier TRN</span><strong class="mono">${escapeHtml(inv.supplier_trn||'-')}</strong></div>
+      <div><span>Total Due</span><strong class="mono">${escapeHtml(inv.currency||'AED')} ${fmt(total)}</strong></div>
+      <div><span>Paid</span><strong class="mono ${paid>0?'paid-ok':'paid-due'}">${escapeHtml(inv.currency||'AED')} ${fmt(paid)}</strong></div>
     </div>
     <div class="ai-card-foot">
       <span class="purchase-ai-details">${escapeHtml(details)}</span>
@@ -6737,6 +7110,8 @@ function purchaseRecordFromExtractedInvoice(inv){
     status:status==='Valid'?'Received':status,
     extraction_status:status,
     supplier_trn:inv.supplier_trn||'',
+    bill_to:inv.bill_to||'',
+    currency:inv.currency||'AED',
     issues:inv.issues||'',
     discount_type:inv.discount_type||'None',
     discount_value:purchaseAiNumber(inv.discount_value),
@@ -7124,7 +7499,6 @@ function countPurchaseAiInvoiceNo(invoiceNo){
 function purchaseAiUploadActionsHtml(){
   return `<div class="row-actions">
     <button class="ai-card-action view" type="button" title="View" aria-label="View purchase AI invoice" onclick="openPurchaseAiView(this)">${viewIconSvg()}</button>
-    <button class="ai-card-action edit" type="button" title="Edit" aria-label="Edit purchase AI row" onclick="openPurchaseAiEdit(this)">${editIconSvg()}</button>
     <button class="ai-card-action approve" type="button" title="Approve" aria-label="Approve purchase AI row" onclick="approvePurchaseAiRow(this)">${checkIconSvg()}<span>Approve</span></button>
     <button class="ai-card-action delete" type="button" title="Delete" aria-label="Delete purchase AI row" onclick="deletePurchaseAiRow(this)">${deleteIconSvg()}</button>
   </div>`;
@@ -8077,7 +8451,7 @@ function resetManualPurchase(){
 }
 
 function startPurchaseTransaction(type='purchase'){
-  currentPurchaseTransactionType=type==='return'?'return':'purchase';
+  currentPurchaseTransactionType=type==='return'?'return':type==='local_po'?'local_po':'purchase';
   closeM('m-add-choice');
   go('purchase');
   setTimeout(()=>{
@@ -8089,12 +8463,18 @@ function startPurchaseTransaction(type='purchase'){
 }
 
 function configureManualPurchaseMode(){
-  const isReturn=currentPurchaseTransactionType==='return';
-  setText('mp-form-title',isReturn?'Purchase Return':'Add Purchase');
-  setText('mp-form-sub',isReturn?'Supplier return entry for returned goods, debit notes, or purchase adjustments':'Manual supplier purchase entry with items, discounts, tax, shipping, and payment');
-  setText('mp-save-btn',isReturn?'Save Purchase Return':'Save');
+  const t=currentPurchaseTransactionType;
+  const isReturn=t==='return';
+  const isLPO=t==='local_po';
+  const title=isReturn?'Purchase Return':isLPO?'Local Purchase Order':'Add Purchase';
+  const sub=isReturn?'Supplier return entry for returned goods, debit notes, or purchase adjustments':isLPO?'Local purchase order for domestic suppliers':'Manual supplier purchase entry with items, discounts, tax, shipping, and payment';
+  const btn=isReturn?'Save Purchase Return':isLPO?'Save LPO':'Save';
+  const prefix=isReturn?'PRET':isLPO?'LPO':'PUR';
+  setText('mp-form-title',title);
+  setText('mp-form-sub',sub);
+  setText('mp-save-btn',btn);
   const ref=document.getElementById('mp-ref');
-  if(ref&&!ref.value)ref.value=`${isReturn?'PRET':'PUR'}-${new Date().getFullYear()}-${String(Date.now()).slice(-5)}`;
+  if(ref&&!ref.value)ref.value=`${prefix}-${new Date().getFullYear()}-${String(Date.now()).slice(-5)}`;
 }
 
 async function saveManualPurchase(){
@@ -8109,6 +8489,7 @@ async function saveManualPurchase(){
   const totals=calcManualPurchase();
   const status=totals.due<=0?'Paid':'Pending Payment';
   const isReturn=currentPurchaseTransactionType==='return';
+  const isLPO=currentPurchaseTransactionType==='local_po';
   if(!document.querySelector('#mp-lines tr')){
     ensureManualPurchaseLine();
     toast('Add at least one product','warn');
@@ -8125,7 +8506,7 @@ async function saveManualPurchase(){
     toast('Each purchase line needs product name and quantity','warn');
     return;
   }
-  const ref=(document.getElementById('mp-ref')?.value||`${isReturn?'PRET':'PUR'}-${Date.now()}`).trim();
+  const ref=(document.getElementById('mp-ref')?.value||`${isReturn?'PRET':isLPO?'LPO':'PUR'}-${Date.now()}`).trim();
   const record={
     ref,
     supplier,
@@ -8154,8 +8535,8 @@ async function saveManualPurchase(){
     paid_on:document.getElementById('mp-paid-on')?.value||'',
     shipping_details:document.getElementById('mp-shipping-details')?.value||'',
     notes:document.getElementById('mp-notes')?.value||'',
-    source:isReturn?'Purchase Return':'Manual',
-    document_type:isReturn?'Purchase Return':'Purchase Invoice'
+    source:isReturn?'Purchase Return':isLPO?'Local PO':'Manual',
+    document_type:isReturn?'Purchase Return':isLPO?'Local Purchase Order':'Purchase Invoice'
   };
   const wasEditing=Boolean(manualPurchaseEditingRef);
   if(manualPurchaseEditingRef){
@@ -8183,7 +8564,12 @@ async function saveManualPurchase(){
   const refField=document.getElementById('mp-ref');
   if(refField)refField.disabled=false;
   updatePurchaseRecordControls(purchaseRecordsTotal,purchaseRecordCache.size);
-  stab(document.querySelector('#page-purchase .tab:nth-child(5)'),'p-records');
+  renderLPOList();
+  if(isLPO){
+    stab(document.querySelector('#page-purchase .tab:nth-child(6)'),'p-lpo');
+  }else{
+    stab(document.querySelector('#page-purchase .tab:nth-child(5)'),'p-records');
+  }
 }
 
 function purchaseRecordFromRow(row){
@@ -8307,9 +8693,9 @@ function renderPurchaseRecordPreview(purchase,options={}){
       </div>
       <div class="purchase-edit-table-wrap">
         <table class="tbl purchase-edit-lines">
-          <thead><tr><th>#</th><th>Product</th><th>SKU</th><th>Qty</th><th>Unit</th><th>Unit Cost</th><th>Line Total</th></tr></thead>
+          <thead><tr><th>#</th><th>Product</th><th>SKU</th><th>Qty</th><th>Unit</th><th>Unit Cost</th><th>Line Total</th><th></th></tr></thead>
           <tbody>
-            ${lines.map((line,index)=>`<tr class="pv-line"><td>${index+1}</td><td><input class="fi pv-product" value="${escapeHtml(line.product)}" ${editable?'':'readonly'}></td><td><input class="fi mono pv-sku" value="${escapeHtml(line.sku||'')}" ${editable?'':'readonly'}></td><td><input class="fi mono pv-qty" value="${fmt(line.qty)}" oninput="calcPurchasePreviewEdit()" ${editable?'':'readonly'}></td><td><input class="fi pv-unit" value="${escapeHtml(line.unit)}" ${editable?'':'readonly'}></td><td><input class="fi mono pv-cost" value="${fmt(line.cost)}" oninput="calcPurchasePreviewEdit()" ${editable?'':'readonly'}></td><td><input class="fi mono pv-line-total" value="${fmt(line.total)}" readonly></td></tr>`).join('')}
+            ${lines.map((line,index)=>`<tr class="pv-line"><td>${index+1}</td><td><input class="fi pv-product" value="${escapeHtml(line.product)}" ${editable?'':'readonly'}></td><td><input class="fi mono pv-sku" value="${escapeHtml(line.sku||'')}" ${editable?'':'readonly'}></td><td><input class="fi mono pv-qty" value="${fmt(line.qty)}" oninput="calcPurchasePreviewEdit()" ${editable?'':'readonly'}></td><td><input class="fi pv-unit" value="${escapeHtml(line.unit)}" ${editable?'':'readonly'}></td><td><input class="fi mono pv-cost" value="${fmt(line.cost)}" oninput="calcPurchasePreviewEdit()" ${editable?'':'readonly'}></td><td><input class="fi mono pv-line-total" value="${fmt(line.total)}" readonly></td><td><button class="icon-btn danger" type="button" title="Delete row" onclick="deletePurchasePreviewLine(this)">${deleteIconSvg()}</button></td></tr>`).join('')}
           </tbody>
         </table>
       </div>
@@ -8372,6 +8758,15 @@ function collectPurchasePreviewLines(){
     unit_cost:parseAmount(row.querySelector('.pv-cost')?.value),
     line_total:parseAmount(row.querySelector('.pv-line-total')?.value)
   })).filter(line=>line.product||line.quantity||line.unit_cost);
+}
+
+function deletePurchasePreviewLine(btn){
+  const row=btn.closest('tr.pv-line');
+  if(!row)return;
+  row.remove();
+  let i=1;
+  document.querySelectorAll('#purchase-view-body .pv-line td:first-child').forEach(td=>td.textContent=i++);
+  calcPurchasePreviewEdit();
 }
 
 function savePurchasePreviewEdit(){
@@ -8467,6 +8862,74 @@ function editPurchaseRecord(btn){
   setText('mp-save-btn','Update Purchase');
   calcManualPurchase();
   stab(document.querySelector('#page-purchase .tab:nth-child(4)'),'p-manual');
+}
+
+function copyPurchaseRecord(btn){
+  const row=btn.closest('tr');
+  const purchase=purchaseRecordFromRow(row);
+  if(!purchase?.ref){toast('Purchase record not found','warn');return;}
+  const isLPO=purchase.document_type==='Local Purchase Order';
+  currentPurchaseTransactionType=isLPO?'local_po':'purchase';
+  go('purchase');
+  setTimeout(()=>{
+    const tab=document.querySelector('#page-purchase .tab:nth-child(4)');
+    if(tab)stab(tab,'p-manual');
+    resetManualPurchase();
+    const prefix=isLPO?'LPO':'PUR';
+    setSelectValue(document.getElementById('mp-supplier'),purchase.supplier);
+    setFieldValue(document.getElementById('mp-ref'),`${prefix}-${new Date().getFullYear()}-${String(Date.now()).slice(-5)}`);
+    setFieldValue(document.getElementById('mp-date'),purchase.date||'');
+    setFieldValue(document.getElementById('mp-address'),purchase.address||'');
+    setSelectValue(document.getElementById('mp-term'),purchase.pay_term||'');
+    setSelectValue(document.getElementById('mp-discount-type'),purchase.discount_type||'None');
+    setFieldValue(document.getElementById('mp-discount'),purchase.discount_value||purchase.discount||0);
+    setSelectValue(document.getElementById('mp-tax'),purchase.tax_type||'None');
+    setFieldValue(document.getElementById('mp-notes'),purchase.notes||'');
+    setFieldValue(document.getElementById('mp-shipping-details'),purchase.shipping_details||'');
+    setFieldValue(document.getElementById('mp-shipping'),purchase.shipping||0);
+    const expensesBox=document.getElementById('mp-expenses');
+    if(expensesBox)expensesBox.innerHTML='';
+    (purchase.additional_expenses||[]).forEach(addManualPurchaseExpense);
+    const tbody=document.getElementById('mp-lines');
+    if(tbody)tbody.innerHTML='';
+    const lines=Array.isArray(purchase.lines)&&purchase.lines.length?purchase.lines:[{product:'Purchase item',quantity:purchase.items||1,unit_cost:Number(purchase.net_amount||purchase.total||0)/Math.max(1,Number(purchase.items||1)),discount_percent:0,profit_margin:0}];
+    lines.forEach(addManualPurchaseLineFromData);
+    configureManualPurchaseMode();
+    calcManualPurchase();
+    toast(`Copied from ${purchase.ref} — review and save as new entry`,'info');
+  },50);
+}
+
+function buildLPORow(purchase){
+  const ref=purchase?.ref||purchase?.invoice_no||purchase?.reference;
+  if(!ref)return null;
+  const quantity=purchaseRecordQuantity(purchase);
+  const row=document.createElement('tr');
+  row.dataset.purchaseRef=String(ref);
+  row.dataset.purchaseRecord=JSON.stringify({...purchase,ref,items:quantity});
+  const status=purchase.status||'Draft';
+  const statusClass=status==='Paid'?'b-g':status==='Received'?'b-b':status.includes('Payment')?'b-a':'b-gray';
+  row.innerHTML=`<td class="mono">${escapeHtml(ref)}</td><td>${escapeHtml(purchaseRecordProductSummary(purchase))}</td><td>${escapeHtml(purchase.supplier||'-')}</td><td>${escapeHtml(purchase.date||'-')}</td><td>${escapeHtml(purchase.location||'-')}</td><td class="mono">${Number(quantity||0).toLocaleString('en-AE',{maximumFractionDigits:4})}</td><td class="mono">${Number(purchase.net_amount||0).toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2})}</td><td class="mono">${Number(purchase.tax_amount||0).toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2})}</td><td class="mono">${Number(purchase.total||0).toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2})}</td><td class="mono">${Number(purchase.paid||0).toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2})}</td><td class="mono">${Number(purchase.due||0).toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2})}</td><td><span class="b ${statusClass}">${escapeHtml(status)}</span></td><td data-action-col="1"><div class="row-actions"><button class="icon-btn view" type="button" title="View" aria-label="View LPO" onclick="openPurchaseRecordPreview(this)">${viewIconSvg()}</button><button class="icon-btn copy" type="button" title="Copy" aria-label="Copy LPO" onclick="copyPurchaseRecord(this)">${copyIconSvg()}</button><button class="icon-btn danger" type="button" title="Delete" aria-label="Delete LPO" onclick="deletePurchaseRecord(this)">${deleteIconSvg()}</button></div></td>`;
+  return row;
+}
+
+function renderLPOList(){
+  const tbody=document.getElementById('lpo-record-tbody');
+  if(!tbody)return;
+  const records=[...purchaseRecordCache.values()].filter(p=>p.document_type==='Local Purchase Order');
+  const countEl=document.getElementById('lpo-record-count');
+  if(countEl)countEl.textContent=records.length?`${records.length} local purchase order${records.length===1?'':'s'}`:'No local purchase orders yet.';
+  if(!records.length){
+    tbody.innerHTML=`<tr data-empty-state="1"><td colspan="13" style="color:var(--text3);text-align:center">No local purchase orders yet.</td></tr>`;
+    return;
+  }
+  const fragment=document.createDocumentFragment();
+  records.forEach(purchase=>{
+    const row=buildLPORow(purchase);
+    if(row)fragment.appendChild(row);
+  });
+  tbody.innerHTML='';
+  tbody.appendChild(fragment);
 }
 
 let lineCount=1;
@@ -10863,6 +11326,10 @@ function checkIconSvg(){
   return `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.3l3 3L13 4.7"/></svg>`;
 }
 
+function copyIconSvg(){
+  return `<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5" y="1" width="8" height="10" rx="1.2"/><rect x="2" y="5" width="8" height="10" rx="1.2"/></svg>`;
+}
+
 function uploadIconSvg(){
   return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V5"/><path d="M8 9l4-4 4 4"/><path d="M5 15v3.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>`;
 }
@@ -11897,9 +12364,9 @@ function buildDraftQuotationRecord(status='Sent'){
     customer:document.getElementById('quote-customer')?.value?.trim()||'New Customer',
     date:document.getElementById('quote-date')?.value||'Today',
     valid_until:document.getElementById('quote-valid')?.value||'15 days',
-    subtotal:document.getElementById('quote-subtotal')?.textContent?.replace('AED ','')||'0.00',
-    vat_amount:document.getElementById('quote-vat')?.textContent?.replace('AED ','')||'0.00',
-    total:document.getElementById('quote-total')?.textContent?.replace('AED ','')||'0.00',
+    subtotal:document.getElementById('quote-subtotal')?.textContent?.replace('AED ','').replace('AED ','')||'0.00',
+    vat_amount:document.getElementById('quote-vat')?.textContent?.replace('AED ','').replace('AED ','')||'0.00',
+    total:document.getElementById('quote-total')?.textContent?.replace('AED ','').replace('AED ','')||'0.00',
     status,
     owner:'Sales Team',
     subject:document.getElementById('quote-subject')?.value?.trim()||'',

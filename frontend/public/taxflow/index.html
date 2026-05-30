@@ -156,77 +156,184 @@
   <div class="content">
 
 <!-- ═══════════════════ DASHBOARD ═══════════════════ -->
-<div class="page on" id="page-dashboard">
-  <section class="dash-hero mb16">
-    <div class="dash-hero-main">
-      <div class="dash-hero-kicker"><span class="live-dot"></span> Live Finance Command Center</div>
-      <div class="dash-hero-title">TaxFlow UAE</div>
-      <div class="dash-hero-copy">Revenue, VAT, collections, payroll, documents, and exceptions from the active database.</div>
-      <div class="dash-hero-actions">
-        <button class="btn btn-g" type="button" onclick="go('purchase')">Upload Purchase</button>
-        <button class="btn btn-g" type="button" onclick="go('reports')">Open Reports</button>
+<div class="page on" id="page-dashboard" style="max-width:1400px;margin:0 auto">
+
+  <!-- ── HEADER BAR ── -->
+  <div class="dv2-header mb20">
+    <div class="dv2-header-left">
+      <div class="dv2-greeting" id="dash-greeting">Good morning</div>
+      <div class="dv2-date" id="dash-today-date"></div>
+    </div>
+    <div class="dv2-header-right">
+      <div class="dv2-live-badge"><span class="live-dot"></span><span id="dash-period-label">Live</span></div>
+      <button class="dv2-action-btn" onclick="go('sales')">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14"><path d="M2 4h12l-1 8H3L2 4z"/></svg>New Invoice
+      </button>
+      <button class="dv2-action-btn accent" onclick="go('purchase')">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14"><path d="M2 2h2l2 8h8"/><circle cx="7" cy="13" r="1"/><circle cx="13" cy="13" r="1"/></svg>Add Purchase
+      </button>
+    </div>
+  </div>
+
+  <!-- ── ROW 1: 4 Gradient KPI Cards ── -->
+  <div class="dv2-kpi-grid mb20">
+
+    <div class="dv2-kpi-card" style="--kc1:#6366f1;--kc2:#818cf8">
+      <div class="dv2-kpi-glow"></div>
+      <div class="dv2-kpi-inner">
+        <div class="dv2-kpi-head">
+          <div class="dv2-kpi-icon">
+            <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path d="M2 11l8-9 8 9v7a1 1 0 01-1 1H3a1 1 0 01-1-1v-7z"/></svg>
+          </div>
+          <span class="dv2-kpi-badge up" id="dash-rev-trend">—</span>
+        </div>
+        <div class="dv2-kpi-value" id="dash-revenue">AED 0</div>
+        <div class="dv2-kpi-label">Total Revenue</div>
+        <div class="dv2-kpi-meta" id="dash-revenue-sub">Loading…</div>
+        <div class="dv2-spark" id="dash-rev-spark"></div>
       </div>
     </div>
-    <div class="dash-hero-visual" aria-hidden="true">
-      <div class="dash-orbit-ring">
-        <span class="dash-node node-a"></span>
-        <span class="dash-node node-b"></span>
-        <span class="dash-node node-c"></span>
-        <div class="dash-core">
-          <strong id="dash-hero-score">0%</strong>
-          <span>Ready</span>
+
+    <div class="dv2-kpi-card" style="--kc1:#ef4444;--kc2:#f87171">
+      <div class="dv2-kpi-glow"></div>
+      <div class="dv2-kpi-inner">
+        <div class="dv2-kpi-head">
+          <div class="dv2-kpi-icon">
+            <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path d="M3 1h1l3 9h7l2-6H6"/><circle cx="8" cy="17" r="1.5"/><circle cx="14" cy="17" r="1.5"/></svg>
+          </div>
+          <span class="dv2-kpi-badge dn" id="dash-pur-trend">—</span>
+        </div>
+        <div class="dv2-kpi-value" id="dash-total-purchases">AED 0</div>
+        <div class="dv2-kpi-label">Total Purchases</div>
+        <div class="dv2-kpi-meta" id="dash-purchases-sub">Loading…</div>
+        <div class="dv2-spark" id="dash-pur-spark"></div>
+      </div>
+    </div>
+
+    <div class="dv2-kpi-card" style="--kc1:#f59e0b;--kc2:#fbbf24">
+      <div class="dv2-kpi-glow"></div>
+      <div class="dv2-kpi-inner">
+        <div class="dv2-kpi-head">
+          <div class="dv2-kpi-icon">
+            <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path d="M3 3h14v3H3V3zm0 5h14v3H3V8zm0 5h9v3H3v-3z"/></svg>
+          </div>
+          <span class="dv2-kpi-badge warn" id="dash-vat-trend">Due</span>
+        </div>
+        <div class="dv2-kpi-value" id="dash-vat">AED 0</div>
+        <div class="dv2-kpi-label">Net VAT Payable</div>
+        <div class="dv2-kpi-meta" id="dash-vat-sub">Output – Input</div>
+        <div class="dv2-spark" id="dash-vat-spark"></div>
+      </div>
+    </div>
+
+    <div class="dv2-kpi-card" style="--kc1:#10b981;--kc2:#34d399">
+      <div class="dv2-kpi-glow"></div>
+      <div class="dv2-kpi-inner">
+        <div class="dv2-kpi-head">
+          <div class="dv2-kpi-icon">
+            <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path d="M10 1l2.5 5.5L18 7.5l-4 4 1 5.5L10 14.5 5 17l1-5.5-4-4 5.5-1z"/></svg>
+          </div>
+          <span class="dv2-kpi-badge up" id="dash-profit-trend">—</span>
+        </div>
+        <div class="dv2-kpi-value" id="dash-gross-profit">AED 0</div>
+        <div class="dv2-kpi-label">Gross Profit</div>
+        <div class="dv2-kpi-meta" id="dash-profit-sub">Revenue – Purchases</div>
+        <div class="dv2-spark" id="dash-profit-spark"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── ROW 2: Chart (wide) + AR/AP (narrow) ── -->
+  <!-- ── ROW 3: VAT Donut + Invoice Status + Top Customers ── -->
+  <div class="dv2-row3 mb20">
+
+    <!-- VAT donut -->
+    <div class="dv2-vat-card">
+      <div class="dv2-section-title mb12">VAT Position <span class="b b-a" id="dash-vat-status-badge" style="margin-left:8px;font-size:11px">Calculating</span></div>
+      <div class="dv2-vat-donut">
+        <div class="dv2-donut-wrap">
+          <svg viewBox="0 0 100 100" width="100" height="100">
+            <circle cx="50" cy="50" r="38" fill="none" stroke="var(--border2)" stroke-width="12"/>
+            <circle cx="50" cy="50" r="38" fill="none" stroke="#6366f1" stroke-width="12" stroke-dasharray="0 239" stroke-dashoffset="60" id="dash-vat-ring-output" style="transition:stroke-dasharray .7s"/>
+            <circle cx="50" cy="50" r="38" fill="none" stroke="#10b981" stroke-width="12" stroke-dasharray="0 239" stroke-dashoffset="60" id="dash-vat-ring-input" style="transition:stroke-dasharray .7s;opacity:.75"/>
+          </svg>
+          <div class="dv2-donut-center">
+            <div style="font-size:11px;color:var(--text3)">UAE VAT</div>
+            <div style="font-size:17px;font-weight:700;color:var(--text)" id="dash-vat-rate">5%</div>
+          </div>
+        </div>
+        <div class="dv2-vat-legend">
+          <div class="dv2-vat-item"><span class="dv2-dot" style="background:#6366f1"></span><div><div style="font-size:11px;color:var(--text3)">Output VAT</div><div class="dv2-vat-num" id="dash-vat-output">AED 0</div></div></div>
+          <div class="dv2-vat-item"><span class="dv2-dot" style="background:#10b981"></span><div><div style="font-size:11px;color:var(--text3)">Input VAT</div><div class="dv2-vat-num" id="dash-vat-input">AED 0</div></div></div>
+          <div style="border-top:1px solid var(--border);margin:10px 0 8px"></div>
+          <div class="dv2-vat-item"><span class="dv2-dot" style="background:#f59e0b"></span><div><div style="font-size:11px;color:var(--text3)">Net Payable</div><div class="dv2-vat-num" id="dash-vat-net" style="color:#f59e0b">AED 0</div></div></div>
         </div>
       </div>
-      <div class="dash-wave">
-        <i style="height:38%"></i><i style="height:64%"></i><i style="height:48%"></i><i style="height:82%"></i><i style="height:56%"></i><i style="height:74%"></i><i style="height:46%"></i>
+    </div>
+
+    <!-- Invoice status -->
+    <div class="dv2-status-card">
+      <div class="dv2-section-title mb16">Invoice Status</div>
+      <div id="dash-invoice-status"><div class="dv2-loading">Reading database…</div></div>
+    </div>
+
+    <!-- Quick Actions (swapped from row 4) -->
+    <div class="dv2-actions-card">
+      <div class="dv2-section-title mb14">Quick Actions</div>
+      <div class="dv2-qa-grid">
+        <button class="dv2-qa" onclick="go('sales')" style="--qa:#6366f1">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path d="M3 5h14M3 10h14M3 15h8"/></svg><span>Invoice</span>
+        </button>
+        <button class="dv2-qa" onclick="go('purchase')" style="--qa:#ef4444">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path d="M3 3h14v14H3z"/><path d="M7 7h6M7 11h4"/></svg><span>Purchase</span>
+        </button>
+        <button class="dv2-qa" onclick="go('quotations')" style="--qa:#f59e0b">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path d="M5 3h8l2 2v12H5z"/><path d="M8 3v4h5"/></svg><span>Quote</span>
+        </button>
+        <button class="dv2-qa" onclick="go('accounting')" style="--qa:#10b981">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path d="M3 4h14v12H3z"/><path d="M3 9h14M8 9v7"/></svg><span>Ledger</span>
+        </button>
+        <button class="dv2-qa" onclick="go('reports')" style="--qa:#8b5cf6">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path d="M4 17V8l4-5 4 5v9"/><path d="M8 17v-5h4v5"/></svg><span>Reports</span>
+        </button>
+        <button class="dv2-qa" onclick="go('exception')" style="--qa:#f472b6">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18"><circle cx="10" cy="10" r="7"/><path d="M10 7v3M10 13v1"/></svg><span>Alerts</span>
+        </button>
       </div>
     </div>
-    <div class="dash-hero-side">
-      <div class="dash-mini-card"><span>Database Records</span><strong id="dash-hero-records">0</strong></div>
-      <div class="dash-mini-card"><span>Net VAT</span><strong id="dash-hero-vat">AED 0.00</strong></div>
-      <div class="dash-mini-card"><span>Open Amount</span><strong id="dash-hero-open">AED 0.00</strong></div>
-    </div>
-  </section>
-  <div class="g4 mb16">
-    <div class="stat dash-kpi kpi-revenue"><div class="kpi-icon">AED</div><div class="stat-lbl">Total Revenue</div><div class="stat-val" id="dash-revenue" style="color:var(--accent)">Loading...</div><div class="stat-delta up" id="dash-revenue-sub">Reading database</div></div>
-    <div class="stat dash-kpi kpi-vat"><div class="kpi-icon">VAT</div><div class="stat-lbl">VAT Payable</div><div class="stat-val" id="dash-vat" style="color:var(--amber)">Loading...</div><div class="stat-delta" id="dash-vat-sub" style="color:var(--text3)">Reading database</div></div>
-    <div class="stat dash-kpi kpi-invoices"><div class="kpi-icon">INV</div><div class="stat-lbl">Open Invoices</div><div class="stat-val" id="dash-open-invoices" style="color:var(--purple)">Loading...</div><div class="stat-delta up" id="dash-open-invoices-sub">Reading database</div></div>
-    <div class="stat dash-kpi kpi-staff"><div class="kpi-icon">HR</div><div class="stat-lbl">Staff Present</div><div class="stat-val" id="dash-staff" style="color:var(--green)">Loading...</div><div class="stat-delta dn" id="dash-staff-sub">Reading database</div></div>
+
   </div>
-  <div class="g2 mb16">
-    <div class="card dash-chart-card">
-      <div class="card-hd"><div><div class="card-title">Monthly Revenue vs VAT</div><div class="card-sub">Sales bars with VAT overlay</div></div><span class="b b-b">Live</span></div>
-      <div class="bars mb12" id="dash-monthly-bars">
-        <div style="font-size:12px;color:var(--text3)">Reading database...</div>
-      </div>
-      <div class="divider"></div>
-      <div class="g3" id="dash-monthly-summary">
-        <div style="font-size:12px;color:var(--text3)">Reading database...</div>
-      </div>
+
+  <!-- ── ROW 4: Activity + Staff + Top Customers ── -->
+  <div class="dv2-row4">
+
+    <div class="dv2-activity-card">
+      <div class="dv2-section-head mb12"><div class="dv2-section-title">Recent Activity</div><span class="bio-pulse"></span></div>
+      <div id="dash-recent-activity"><div class="dv2-loading">Reading database…</div></div>
     </div>
-    <div class="card dash-activity-card">
-      <div class="card-hd"><div><div class="card-title">Recent Activity</div><div class="card-sub">Latest database events</div></div><span class="bio-pulse"></span></div>
-      <div id="dash-recent-activity"><div style="font-size:12px;color:var(--text3)">Reading database...</div></div>
+
+    <div class="dv2-staff-card">
+      <div class="dv2-section-head mb12"><div class="dv2-section-title">Staff Today</div><span class="bio-pulse"></span></div>
+      <div id="dash-staff-today"><div class="dv2-loading">Reading database…</div></div>
     </div>
+
+    <!-- Top Customers (swapped from row 3) -->
+    <div class="dv2-customers-card">
+      <div class="dv2-section-head mb12">
+        <div class="dv2-section-title">Top Customers</div>
+        <button class="btn btn-g btn-sm" onclick="go('sales')">View All</button>
+      </div>
+      <div id="dash-top-customers-v2"></div>
+    </div>
+
   </div>
-  <div class="g3">
-    <div class="card dash-table-card">
-      <div class="card-hd"><div class="card-title">Top Customers</div></div>
-      <table class="tbl">
-        <tbody id="dash-top-customers"><tr><td colspan="2" style="color:var(--text3)">Reading database...</td></tr></tbody>
-      </table>
-    </div>
-    <div class="card dash-status-card">
-      <div class="card-hd"><div class="card-title">Invoice Status</div></div>
-      <div id="dash-invoice-status"><div style="font-size:12px;color:var(--text3)">Reading database...</div></div>
-    </div>
-    <div class="card dash-staff-card">
-      <div class="card-hd"><div class="card-title">Staff Today</div><span class="bio-pulse"></span></div>
-      <div id="dash-staff-today">
-        <div style="font-size:12px;color:var(--text3)">Reading database...</div>
-      </div>
-    </div>
+
+  <!-- hidden stubs kept for JS compatibility -->
+  <div style="display:none">
+    <table><tbody id="dash-top-customers"></tbody></table>
   </div>
+
 </div>
 
 <!-- ═══════════════════ COMPANY REGISTRATION ═══════════════════ -->
@@ -335,29 +442,62 @@
       </div>
       <div class="card">
         <div class="card-hd"><div class="card-title">Imported Files</div><span class="b b-b" id="sales-file-count">0 files</span></div>
-        <div id="sales-file-list">
+        <div id="sales-file-list" style="max-height:60vh;overflow-y:auto;padding-right:4px">
           <div style="font-size:12.5px;color:var(--text3);line-height:1.7">No files uploaded yet. Upload invoice PDFs, Excel files, or images to extract invoice data.</div>
         </div>
         <div id="sales-prog" style="display:none;margin-top:12px">
           <div class="flx-b" style="margin-bottom:4px"><span style="font-size:12px;color:var(--text2)" id="sales-fname">Uploading...</span><span id="sales-pct" style="font-size:11px;color:var(--text3)">0%</span></div>
           <div class="prog-bar"><div class="prog-fill" id="sales-fill" style="width:0%;background:var(--accent)"></div></div>
         </div>
+        <div style="margin-top:12px">
+          <button class="btn btn-g btn-sm" type="button" onclick="showM('m-sales-old-uploads')">View Old Uploads</button>
+        </div>
       </div>
     </div>
   </div>
 
   <div class="tab-body" id="s-extract">
-    <div class="card">
+    <div class="card mb16">
       <div class="card-hd">
         <div><div class="card-title">AI Upload Validation</div><div class="card-sub">Review updated invoice details, fix validation issues, then save selected rows</div></div>
         <div class="flx"><button class="btn btn-g btn-sm" onclick="toggleSalesAiSelection(true)">Select All</button><button class="btn btn-g btn-sm" onclick="runSalesImport()">Extract Pending</button><button class="btn btn-p btn-sm" onclick="storeExtractedSalesInvoices()">Save All</button></div>
       </div>
-      <table class="tbl" data-delete-actions-bound="skip">
-        <thead><tr><th style="width:42px"><input type="checkbox" aria-label="Select all AI invoices" onchange="toggleSalesAiSelection(this.checked)"></th><th>Invoice No.</th><th>Customer</th><th>TRN</th><th>Date</th><th>Subtotal</th><th>VAT</th><th>Total</th><th>Confidence</th><th>Validation</th><th>Details</th><th>Actions</th></tr></thead>
-        <tbody id="sales-ext-tbody">
-          <tr><td colspan="12" style="color:var(--text3);text-align:center">AI uploaded invoice data will appear here for validation.</td></tr>
-        </tbody>
-      </table>
+      <div id="sales-validation-file-status" class="g3 mb16"></div>
+      <div class="ai-card-toolbar flx-b mb12">
+        <label class="flx" style="gap:8px"><input type="checkbox" aria-label="Select all sales AI invoices" onchange="toggleSalesAiSelection(this.checked)"> Select extracted invoices</label>
+        <div class="ai-card-controls">
+          <div class="segmented ai-view-toggle">
+            <button class="seg on" type="button" data-ai-view="grid" onclick="setSalesAiCardView('grid',this)">Grid</button>
+            <button class="seg" type="button" data-ai-view="gallery" onclick="setSalesAiCardView('gallery',this)">Gallery</button>
+          </div>
+          <select class="fi ai-sort-select" id="sales-ai-sort" onchange="applySalesAiSort(true)">
+            <option value="manual">Manual order</option>
+            <option value="invoice">Invoice No.</option>
+            <option value="date">Invoice Date</option>
+            <option value="customer">Customer</option>
+            <option value="total">Invoice Total</option>
+            <option value="validation">Validation</option>
+          </select>
+          <button class="btn btn-g btn-sm" type="button" id="sales-ai-sort-dir" data-dir="asc" onclick="toggleSalesAiSortDirection()">Asc</button>
+        </div>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="tbl" data-delete-actions-bound="skip">
+          <thead><tr><th style="width:36px"><input type="checkbox" aria-label="Select all" onchange="toggleSalesAiSelection(this.checked)"></th><th>Invoice No.</th><th>Customer</th><th>TRN</th><th>Date</th><th>Subtotal</th><th>VAT</th><th>Total</th><th>Confidence</th><th>Validation</th><th>Details</th><th>Actions</th></tr></thead>
+          <tbody id="sales-ext-tbody">
+            <tr><td colspan="12" style="color:var(--text3);text-align:center">AI uploaded invoice data will appear here for validation.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div id="sales-ext-prog" style="display:none;margin-top:14px">
+        <div class="flx-b mb12"><span style="font-size:13px;color:var(--text2)">Extracting...</span><span id="sales-ext-pct" class="mono" style="color:var(--accent)">0%</span></div>
+        <div class="prog-bar"><div class="prog-fill" id="sales-ext-fill" style="width:0%;background:var(--accent)"></div></div>
+      </div>
+    </div>
+    <div class="g3">
+      <div class="stat"><div class="stat-lbl">Total Extracted</div><div class="stat-val" style="color:var(--green);font-size:20px" id="sales-stat-extracted">0</div><div class="stat-delta" style="color:var(--text3)">invoices this period</div></div>
+      <div class="stat"><div class="stat-lbl">Needs Review</div><div class="stat-val" style="color:var(--amber);font-size:20px" id="sales-stat-review">0</div></div>
+      <div class="stat"><div class="stat-lbl">Extraction Errors</div><div class="stat-val" style="color:var(--red);font-size:20px" id="sales-stat-errors">0</div></div>
     </div>
   </div>
 
@@ -539,9 +679,9 @@
   <div class="tabs">
     <div class="tab on" onclick="stab(this,'p-upload')">Upload Documents</div>
     <div class="tab" onclick="stab(this,'p-extract')">AI Extraction</div>
-    <div class="tab" onclick="stab(this,'p-validate')">Validation</div>
     <div class="tab" onclick="openPurchaseAddChoice()">Add Purchase</div>
     <div class="tab" onclick="stab(this,'p-records')">Purchase Records</div>
+    <div class="tab" onclick="stab(this,'p-lpo')">Local Purchase Orders</div>
     <div class="tab" onclick="stab(this,'p-vendors')">Vendors</div>
     <div class="tab" onclick="stab(this,'p-master')">Purchase Settings</div>
   </div>
@@ -569,12 +709,15 @@
       </div>
       <div class="card">
         <div class="card-hd"><div class="card-title">Uploaded Files</div><span class="b b-b" id="file-count-badge">0 files</span></div>
-        <div id="pur-file-list">
+        <div id="pur-file-list" style="max-height:60vh;overflow-y:auto;padding-right:4px">
           <div style="font-size:12px;color:var(--text3);padding:10px 0">No uploaded files in database yet.</div>
         </div>
         <div id="pur-prog" style="display:none;margin-top:12px">
           <div class="flx-b" style="margin-bottom:4px"><span style="font-size:12px;color:var(--text2)" id="pur-fname">Uploading...</span><span id="pur-pct" style="font-size:11px;color:var(--text3)">0%</span></div>
           <div class="prog-bar"><div class="prog-fill" id="pur-fill" style="width:0%;background:var(--accent)"></div></div>
+        </div>
+        <div style="margin-top:12px">
+          <button class="btn btn-g btn-sm" type="button" onclick="showM('m-old-uploads')">View Old Uploads</button>
         </div>
       </div>
     </div>
@@ -620,17 +763,6 @@
     </div>
   </div>
 
-  <div class="tab-body" id="p-validate">
-    <div class="card mb12">
-      <div class="card-hd"><div><div class="card-title">Uploaded Document Status</div><div class="card-sub">Completed files are green, partial saves are yellow, and unsaved/failed files are red</div></div></div>
-      <div id="purchase-validation-doc-status">
-        <div style="background:var(--red-bg);border:1px solid var(--red-border);border-radius:10px;padding:14px 16px">
-          <div style="font-size:13.5px;font-weight:600;margin-bottom:3px">No uploaded documents yet</div>
-          <div style="font-size:12px;color:var(--text3)">Upload and extract purchase files to see document status here.</div>
-        </div>
-      </div>
-    </div>
-  </div>
 
   <div class="tab-body" id="p-manual">
     <div class="card mb16">
@@ -722,6 +854,26 @@
         <thead><tr><th>Ref No.</th><th>Product Name</th><th>Supplier</th><th>Date</th><th>Location</th><th>Items</th><th>Net Amount</th><th>Tax</th><th>Shipping</th><th>Total</th><th>Paid</th><th>Due</th><th>Source</th><th>Status</th><th data-action-col="1">Actions</th></tr></thead>
         <tbody id="purchase-record-tbody">
           <tr data-empty-state="1"><td colspan="15" style="color:var(--text3);text-align:center">No purchase records in database yet.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="tab-body" id="p-lpo">
+    <div class="card">
+      <div class="card-hd">
+        <div>
+          <div class="card-title">Local Purchase Orders</div>
+          <div class="card-sub" id="lpo-record-count">No local purchase orders yet.</div>
+        </div>
+        <div class="flx">
+          <button class="btn btn-p btn-sm" type="button" onclick="startPurchaseTransaction('local_po')">+ New LPO</button>
+        </div>
+      </div>
+      <table class="tbl" data-delete-actions-bound="skip">
+        <thead><tr><th>Ref No.</th><th>Product Name</th><th>Supplier</th><th>Date</th><th>Location</th><th>Items</th><th>Net Amount</th><th>Tax</th><th>Total</th><th>Paid</th><th>Due</th><th>Status</th><th data-action-col="1">Actions</th></tr></thead>
+        <tbody id="lpo-record-tbody">
+          <tr data-empty-state="1"><td colspan="13" style="color:var(--text3);text-align:center">No local purchase orders yet.</td></tr>
         </tbody>
       </table>
     </div>
@@ -1630,12 +1782,13 @@
 <!-- ═══════════════════ EXPENSE MODULE ═══════════════════ -->
 <div class="page" id="page-expense">
   <div class="tabs">
-    <div class="tab on" onclick="stab(this,'exp-list')">Expense List</div>
+    <div class="tab on" onclick="stab(this,'exp-upload')">AI Upload</div>
     <div class="tab" onclick="stab(this,'exp-create')">New Expense</div>
     <div class="tab" onclick="stab(this,'exp-approve')">Approvals</div>
+    <div class="tab" onclick="stab(this,'exp-list')">Expense List</div>
   </div>
 
-  <div class="tab-body on" id="exp-list">
+  <div class="tab-body" id="exp-list">
     <div class="g4 mb16">
       <div class="stat"><div class="stat-lbl">Total Expenses</div><div class="stat-val" style="color:var(--accent)">AED 84,500</div><div class="stat-delta">this month</div></div>
       <div class="stat"><div class="stat-lbl">Pending Approval</div><div class="stat-val" style="color:var(--amber)">AED 12,400</div><div class="stat-delta">5 items</div></div>
@@ -1650,6 +1803,69 @@
           <tr data-empty-state="1"><td colspan="8" style="color:var(--text3);text-align:center">No expenses in database yet.</td></tr>
         </tbody>
       </table>
+    </div>
+  </div>
+
+  <!-- AI Upload tab -->
+  <div class="tab-body on" id="exp-upload">
+    <div class="g2 mb16">
+      <div>
+        <div class="drop-zone mb16" id="exp-ai-zone" onclick="document.getElementById('exp-ai-file').click()" ondragover="event.preventDefault();this.classList.add('dz-over')" ondragleave="this.classList.remove('dz-over')" ondrop="expAiDrop(event)">
+          <div style="font-size:36px;margin-bottom:10px">🧾</div>
+          <div class="drop-title">Upload Expense Receipts</div>
+          <div class="drop-sub">Supports PDF, JPEG, PNG · AI extracts date, amount, vendor and category</div>
+          <div class="flx" style="justify-content:center;gap:6px;margin-top:12px;flex-wrap:wrap">
+            <span class="b b-r">PDF</span><span class="b b-a">JPEG</span><span class="b b-p">PNG</span>
+          </div>
+          <input type="file" id="exp-ai-file" style="display:none" multiple accept=".pdf,.jpg,.jpeg,.png" onchange="expAiUpload(this)">
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-hd"><div class="card-title">Uploaded Receipts</div><span class="b b-b" id="exp-ai-file-count">0 files</span></div>
+        <div id="exp-ai-file-list" style="max-height:60vh;overflow-y:auto;padding-right:4px">
+          <div style="font-size:12px;color:var(--text3);padding:10px 0">No receipts uploaded yet. Upload expense receipts to extract data automatically.</div>
+        </div>
+        <div id="exp-ai-prog" style="display:none;margin-top:12px">
+          <div class="flx-b" style="margin-bottom:4px"><span style="font-size:12px;color:var(--text2)" id="exp-ai-fname">Uploading...</span><span id="exp-ai-pct" style="font-size:11px;color:var(--text3)">0%</span></div>
+          <div class="prog-bar"><div class="prog-fill" id="exp-ai-fill" style="width:0%;background:var(--accent)"></div></div>
+        </div>
+        <div style="margin-top:12px">
+          <button class="btn btn-g btn-sm" type="button" onclick="showM('m-exp-old-uploads')">View Old Uploads</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mb16">
+      <div class="card-hd">
+        <div><div class="card-title">AI Extracted Expenses</div><div class="card-sub">Review extracted details, fix if needed, then save</div></div>
+        <div class="flx">
+          <button class="btn btn-g btn-sm" onclick="toggleExpAiSelection(true)">Select All</button>
+          <button class="btn btn-g btn-sm" onclick="runExpAiExtraction()">Extract Pending</button>
+          <button class="btn btn-p btn-sm" onclick="saveExtractedExpenses()">Save All</button>
+        </div>
+      </div>
+      <div class="ai-card-toolbar flx-b mb12">
+        <label class="flx" style="gap:8px"><input type="checkbox" onchange="toggleExpAiSelection(this.checked)"> Select extracted expenses</label>
+        <div class="ai-card-controls">
+          <div class="segmented ai-view-toggle">
+            <button class="seg on" type="button" onclick="setExpAiView('grid',this)">Grid</button>
+            <button class="seg" type="button" onclick="setExpAiView('gallery',this)">Gallery</button>
+          </div>
+        </div>
+      </div>
+      <div id="exp-ai-tbody" class="ai-card-grid">
+        <div class="ai-empty-state">Upload receipts above — AI will extract expense details automatically.</div>
+      </div>
+      <div id="exp-ai-extract-prog" style="display:none;margin-top:14px">
+        <div class="flx-b mb12"><span style="font-size:13px;color:var(--text2)">Extracting...</span><span id="exp-ai-ext-pct" class="mono" style="color:var(--accent)">0%</span></div>
+        <div class="prog-bar"><div class="prog-fill" id="exp-ai-ext-fill" style="width:0%;background:var(--accent)"></div></div>
+      </div>
+    </div>
+
+    <div class="g3">
+      <div class="stat"><div class="stat-lbl">Receipts Extracted</div><div class="stat-val" style="color:var(--green);font-size:20px" id="exp-ai-stat-extracted">0</div><div class="stat-delta" style="color:var(--text3)">this session</div></div>
+      <div class="stat"><div class="stat-lbl">Needs Review</div><div class="stat-val" style="color:var(--amber);font-size:20px" id="exp-ai-stat-review">0</div></div>
+      <div class="stat"><div class="stat-lbl">Extraction Errors</div><div class="stat-val" style="color:var(--red);font-size:20px" id="exp-ai-stat-errors">0</div></div>
     </div>
   </div>
 
@@ -4359,6 +4575,48 @@ period_locks ─&lt; audit_logs
 </div>
 
 <div class="toasts" id="toasts"></div>
+
+<!-- Sales Old Uploads Status Popup -->
+<div class="overlay" id="m-sales-old-uploads" onclick="closeOvBg(event,'m-sales-old-uploads')">
+  <div class="modal" style="max-width:560px;width:100%">
+    <div class="modal-head flx-b" style="padding:18px 20px 14px">
+      <div>
+        <div class="modal-title">Old Uploads</div>
+        <div class="modal-sub" style="font-size:12px;color:var(--text3);margin-top:2px">Completed files are green, partial saves are yellow, and unsaved/failed files are red</div>
+      </div>
+      <button class="icon-btn" type="button" onclick="closeM('m-sales-old-uploads')" aria-label="Close">&times;</button>
+    </div>
+    <div style="max-height:65vh;overflow-y:auto;padding:0 20px 20px">
+      <div id="sales-validation-doc-status">
+        <div style="background:var(--red-bg);border:1px solid var(--red-border);border-radius:10px;padding:14px 16px">
+          <div style="font-size:13.5px;font-weight:600;margin-bottom:3px">No uploaded documents yet</div>
+          <div style="font-size:12px;color:var(--text3)">Upload and extract sales files to see document status here.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Old Uploads Status Popup -->
+<div class="overlay" id="m-old-uploads" onclick="closeOvBg(event,'m-old-uploads')">
+  <div class="modal" style="max-width:560px;width:100%">
+    <div class="modal-head flx-b" style="padding:18px 20px 14px">
+      <div>
+        <div class="modal-title">Old Uploads</div>
+        <div class="modal-sub" style="font-size:12px;color:var(--text3);margin-top:2px">Completed files are green, partial saves are yellow, and unsaved/failed files are red</div>
+      </div>
+      <button class="icon-btn" type="button" onclick="closeM('m-old-uploads')" aria-label="Close">&times;</button>
+    </div>
+    <div style="max-height:65vh;overflow-y:auto;padding:0 20px 20px">
+      <div id="purchase-validation-doc-status">
+        <div style="background:var(--red-bg);border:1px solid var(--red-border);border-radius:10px;padding:14px 16px">
+          <div style="font-size:13.5px;font-weight:600;margin-bottom:3px">No uploaded documents yet</div>
+          <div style="font-size:12px;color:var(--text3)">Upload and extract purchase files to see document status here.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <script src="src/app.js" defer></script>
 </body>
